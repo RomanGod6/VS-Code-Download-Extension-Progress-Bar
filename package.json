@@ -1,0 +1,71 @@
+{
+  "name": "download-progress-tracker",
+  "displayName": "Download Progress Tracker",
+  "description": "Beautiful download progress tracking with modern UI",
+  "version": "1.0.0",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:downloadProgress.startDownload",
+    "onCommand:downloadProgress.showProgress"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "downloadProgress.startDownload",
+        "title": "Download Progress: Start Download"
+      },
+      {
+        "command": "downloadProgress.showProgress",
+        "title": "Download Progress: Show Downloads"
+      },
+      {
+        "command": "downloadProgress.testDownload",
+        "title": "Download Progress: Test Download (Demo)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "download-progress",
+          "title": "Downloads",
+          "icon": "resources/download.svg"
+        }
+      ]
+    },
+    "views": {
+      "download-progress": [
+        {
+          "id": "downloadProgressView",
+          "name": "Active Downloads"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package",
+    "deploy": "vsce publish",
+    "install-extension": "code --install-extension *.vsix",
+    "dev": "npm run compile && code --extensionDevelopmentPath=$(pwd)"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.75.0",
+    "@vscode/test-electron": "^2.3.0",
+    "typescript": "^5.0.0",
+    "@vscode/vsce": "^2.19.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  }
+}
