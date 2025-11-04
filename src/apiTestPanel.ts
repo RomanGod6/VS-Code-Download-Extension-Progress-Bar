@@ -89,6 +89,15 @@ export class APITestPanel {
                     case 'updateEnvironmentVariables':
                         await this.handleUpdateEnvironmentVariables(message.environmentId, message.variables);
                         break;
+                    case 'addDraftToCollection':
+                        await this.handleAddDraftToCollection(message.request, message.collectionId);
+                        break;
+                    case 'setCollectionAuthorization':
+                        await this.handleSetCollectionAuthorization(message.collectionId, message.authorization);
+                        break;
+                    case 'getCollectionAuthorization':
+                        await this.handleGetCollectionAuthorization(message.collectionId);
+                        break;
                 }
             },
             null,
@@ -273,6 +282,52 @@ export class APITestPanel {
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             vscode.window.showErrorMessage(`Failed to update environment variables: ${errorMessage}`);
+        }
+    }
+
+    private async handleAddDraftToCollection(request: APIRequest, collectionId: string) {
+        try {
+            // Add the draft request immediately to collection
+            this.collectionsManager.addRequestToCollection(collectionId, request);
+            // Collections will auto-refresh via event listener
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            vscode.window.showErrorMessage(`Failed to add request: ${errorMessage}`);
+        }
+    }
+
+    private collectionAuthorizations: Map<string, any> = new Map();
+
+    private async handleSetCollectionAuthorization(collectionId: string, authorization: any) {
+        try {
+            // Store the collection authorization in memory
+            this.collectionAuthorizations.set(collectionId, authorization);
+
+            // Optionally persist to workspace state or secret storage
+            const context = (global as any).extensionContext;
+            if (context) {
+                const allAuths = Object.fromEntries(this.collectionAuthorizations);
+                await context.workspaceState.update('collectionAuthorizations', allAuths);
+            }
+
+            vscode.window.showInformationMessage('Collection authorization set successfully!');
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            vscode.window.showErrorMessage(`Failed to set collection authorization: ${errorMessage}`);
+        }
+    }
+
+    private async handleGetCollectionAuthorization(collectionId: string) {
+        try {
+            const authorization = this.collectionAuthorizations.get(collectionId);
+            this._panel.webview.postMessage({
+                command: 'loadCollectionAuthorization',
+                collectionId: collectionId,
+                authorization: authorization || { type: 'none' }
+            });
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            vscode.window.showErrorMessage(`Failed to get collection authorization: ${errorMessage}`);
         }
     }
 
@@ -1030,23 +1085,42 @@ export class APITestPanel {
                         <option>OPTIONS</option>
                     </select>
                     <input type="text" id="url" placeholder="https://api.example.com/endpoint">
+                    <button class="save-button" onclick="saveCurrentRequest()" id="saveBtn" title="Save Request">💾 Save</button>
                     <button class="send-button" onclick="sendRequest()" id="sendBtn">Send</button>
                 </div>
 
-                <div class="save-controls">
-                    <span class="save-label">Save to:</span>
-                    <select id="save-collection" style="min-width: 200px;">
-                        <option value="">Select collection...</option>
-                    </select>
-                    <button class="save-button" onclick="saveToCollection()">💾 Save Request</button>
-                </div>
-
                 <div class="tabs">
-                    <button class="tab active" onclick="switchTab('headers')">Headers</button>
+                    <button class="tab active" onclick="switchTab('params')">Params</button>
+                    <button class="tab" onclick="switchTab('authorization')">Authorization</button>
+                    <button class="tab" onclick="switchTab('headers')">Headers</button>
                     <button class="tab" onclick="switchTab('body')">Body</button>
                 </div>
 
-                <div id="headers-content" class="tab-content active">
+                <div id="params-content" class="tab-content active">
+                    <div id="params-grid" class="headers-grid">
+                        <input type="text" class="param-key" placeholder="Key">
+                        <input type="text" class="param-value" placeholder="Value">
+                        <button class="remove-btn" onclick="this.parentElement.querySelectorAll('.param-key, .param-value').forEach(el => el.remove()); this.remove();">×</button>
+                    </div>
+                    <button class="add-header-btn" onclick="addParam()">+ Add Parameter</button>
+                </div>
+
+                <div id="authorization-content" class="tab-content">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">Type:</label>
+                        <select id="auth-type" onchange="changeAuthType()" style="width: 100%; max-width: 300px;">
+                            <option value="inherit">Inherit from Collection</option>
+                            <option value="none">No Auth</option>
+                            <option value="bearer">Bearer Token</option>
+                            <option value="basic">Basic Auth</option>
+                            <option value="apikey">API Key</option>
+                        </select>
+                    </div>
+
+                    <div id="auth-fields"></div>
+                </div>
+
+                <div id="headers-content" class="tab-content">
                     <div id="headers-grid" class="headers-grid">
                         <input type="text" class="header-input" placeholder="Header name" value="Content-Type">
                         <input type="text" class="header-input" placeholder="Header value" value="application/json">
@@ -1152,6 +1226,9 @@ export class APITestPanel {
         <div class="context-menu-item" onclick="handleContextMenuAction('addRequest')">
             <span>➕ Add Request</span>
         </div>
+        <div class="context-menu-item" onclick="handleContextMenuAction('setAuthorization')">
+            <span>🔐 Set Authorization</span>
+        </div>
         <div class="context-menu-item" onclick="handleContextMenuAction('renameCollection')">
             <span>✏️ Rename</span>
         </div>
@@ -1160,10 +1237,44 @@ export class APITestPanel {
         </div>
     </div>
 
+    <!-- Collection Authorization Modal -->
+    <div id="collectionAuthModal" class="modal" onclick="closeCollectionAuthModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">🔐 Set Collection Authorization</div>
+                <button class="close-btn" onclick="closeCollectionAuthModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Collection: <span id="collection-auth-name" style="color: var(--vscode-focusBorder);"></span></label>
+                    <p style="font-size: 12px; opacity: 0.7; margin-top: 5px;">All requests in this collection set to "Inherit from Collection" will use this authorization.</p>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Type:</label>
+                    <select id="collection-auth-type" onchange="changeCollectionAuthType()" style="width: 100%; max-width: 300px;">
+                        <option value="none">No Auth</option>
+                        <option value="bearer">Bearer Token</option>
+                        <option value="basic">Basic Auth</option>
+                        <option value="apikey">API Key</option>
+                    </select>
+                </div>
+
+                <div id="collection-auth-fields"></div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button class="save-button" onclick="closeCollectionAuthModal()">Cancel</button>
+                    <button class="send-button" onclick="saveCollectionAuthorization()">Save Authorization</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const vscode = acquireVsCodeApi();
-        let currentTab = 'headers';
+        let currentTab = 'params';
         let collectionsData = [];
+        let collectionAuthorizations = {}; // Store collection-level auth configs
 
         window.addEventListener('message', event => {
             const message = event.data;
@@ -1279,6 +1390,33 @@ export class APITestPanel {
             document.getElementById(tab + '-content').classList.add('active');
         }
 
+        function addParam() {
+            const grid = document.getElementById('params-grid');
+
+            const keyInput = document.createElement('input');
+            keyInput.type = 'text';
+            keyInput.className = 'param-key';
+            keyInput.placeholder = 'Key';
+
+            const valueInput = document.createElement('input');
+            valueInput.type = 'text';
+            valueInput.className = 'param-value';
+            valueInput.placeholder = 'Value';
+
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'remove-btn';
+            removeBtn.textContent = '×';
+            removeBtn.onclick = function() {
+                keyInput.remove();
+                valueInput.remove();
+                removeBtn.remove();
+            };
+
+            grid.appendChild(keyInput);
+            grid.appendChild(valueInput);
+            grid.appendChild(removeBtn);
+        }
+
         function addHeader() {
             const grid = document.getElementById('headers-grid');
 
@@ -1306,6 +1444,137 @@ export class APITestPanel {
             grid.appendChild(removeBtn);
         }
 
+        function changeAuthType() {
+            const authType = document.getElementById('auth-type').value;
+            const authFields = document.getElementById('auth-fields');
+            authFields.innerHTML = '';
+
+            switch(authType) {
+                case 'bearer':
+                    authFields.innerHTML = \`
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Token:</label>
+                            <input type="text" id="auth-bearer-token" placeholder="Enter bearer token" style="width: 100%;">
+                        </div>
+                    \`;
+                    break;
+                case 'basic':
+                    authFields.innerHTML = \`
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Username:</label>
+                            <input type="text" id="auth-basic-username" placeholder="Username" style="width: 100%; max-width: 400px;">
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Password:</label>
+                            <input type="password" id="auth-basic-password" placeholder="Password" style="width: 100%; max-width: 400px;">
+                        </div>
+                    \`;
+                    break;
+                case 'apikey':
+                    authFields.innerHTML = \`
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Key:</label>
+                            <input type="text" id="auth-apikey-key" placeholder="API Key name" style="width: 100%; max-width: 400px;">
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Value:</label>
+                            <input type="text" id="auth-apikey-value" placeholder="API Key value" style="width: 100%; max-width: 400px;">
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Add to:</label>
+                            <select id="auth-apikey-location" style="width: 100%; max-width: 400px;">
+                                <option value="header">Header</option>
+                                <option value="query">Query Params</option>
+                            </select>
+                        </div>
+                    \`;
+                    break;
+                case 'inherit':
+                    // Check if current request is part of a collection
+                    const currentTab = tabs.find(t => t.id === activeTabId);
+                    const collectionId = currentTab?.collectionId;
+
+                    if (collectionId) {
+                        const collectionAuth = collectionAuthorizations[collectionId];
+                        let inheritMessage = 'This request will inherit authorization from its parent collection.';
+
+                        if (collectionAuth) {
+                            switch(collectionAuth.type) {
+                                case 'bearer':
+                                    inheritMessage = \`<strong>Inheriting Bearer Token</strong><br>Token: \${collectionAuth.token ? '•'.repeat(Math.min(20, collectionAuth.token.length)) : 'Not set'}\`;
+                                    break;
+                                case 'basic':
+                                    inheritMessage = \`<strong>Inheriting Basic Auth</strong><br>Username: \${collectionAuth.username || 'Not set'}<br>Password: \${'•'.repeat(8)}\`;
+                                    break;
+                                case 'apikey':
+                                    inheritMessage = \`<strong>Inheriting API Key</strong><br>Key: \${collectionAuth.key || 'Not set'}<br>Location: \${collectionAuth.location || 'header'}\`;
+                                    break;
+                                case 'none':
+                                    inheritMessage = '<strong>Collection has no authorization set.</strong>';
+                                    break;
+                            }
+                        } else {
+                            inheritMessage += '<br><br><em>Collection authorization not configured. Right-click the collection and select "Set Authorization".</em>';
+                        }
+
+                        authFields.innerHTML = \`
+                            <div style="padding: 15px; background-color: var(--vscode-textBlockQuote-background); border-left: 3px solid var(--vscode-focusBorder); border-radius: 4px;">
+                                <p style="margin: 0; font-size: 13px;">\${inheritMessage}</p>
+                            </div>
+                        \`;
+                    } else {
+                        authFields.innerHTML = \`
+                            <div style="padding: 15px; background-color: var(--vscode-textBlockQuote-background); border-left: 3px solid var(--vscode-focusBorder); border-radius: 4px;">
+                                <p style="margin: 0; font-size: 13px;">This request will inherit authorization from its parent collection.</p>
+                                <p style="margin: 10px 0 0 0; font-size: 12px; opacity: 0.8;"><em>This request is not part of a collection.</em></p>
+                            </div>
+                        \`;
+                    }
+                    break;
+            }
+        }
+
+        function getParams() {
+            const grid = document.getElementById('params-grid');
+            const keys = grid.querySelectorAll('.param-key');
+            const values = grid.querySelectorAll('.param-value');
+            const params = {};
+
+            for (let i = 0; i < keys.length; i++) {
+                const key = keys[i].value.trim();
+                const value = values[i].value.trim();
+                if (key && value) {
+                    params[key] = value;
+                }
+            }
+
+            return params;
+        }
+
+        function getAuthorization() {
+            const authType = document.getElementById('auth-type').value;
+
+            switch(authType) {
+                case 'bearer':
+                    const token = document.getElementById('auth-bearer-token')?.value;
+                    return token ? { type: 'bearer', token } : null;
+                case 'basic':
+                    const username = document.getElementById('auth-basic-username')?.value;
+                    const password = document.getElementById('auth-basic-password')?.value;
+                    return (username && password) ? { type: 'basic', username, password } : null;
+                case 'apikey':
+                    const key = document.getElementById('auth-apikey-key')?.value;
+                    const value = document.getElementById('auth-apikey-value')?.value;
+                    const location = document.getElementById('auth-apikey-location')?.value;
+                    return (key && value) ? { type: 'apikey', key, value, location } : null;
+                case 'none':
+                    return { type: 'none' };
+                case 'inherit':
+                default:
+                    return { type: 'inherit' };
+            }
+        }
+
         function getHeaders() {
             const grid = document.getElementById('headers-grid');
             const inputs = grid.querySelectorAll('input');
@@ -1322,11 +1591,76 @@ export class APITestPanel {
             return headers;
         }
 
-        function sendRequest() {
+        function saveCurrentRequest() {
+            const tab = tabs.find(t => t.id === activeTabId);
+            if (!tab || !tab.collectionId) {
+                alert('This request must be part of a collection. Right-click a collection and select "Add Request".');
+                return;
+            }
+
             const method = document.getElementById('method').value;
             const url = document.getElementById('url').value;
             const body = document.getElementById('body').value;
             const headers = getHeaders();
+            const params = getParams();
+            const authorization = getAuthorization();
+
+            if (!url) {
+                alert('Please enter a URL');
+                return;
+            }
+
+            const request = {
+                id: tab.requestId || 'req_' + Date.now(),
+                name: method + ' ' + (url.split('?')[0].split('/').pop() || 'Request'),
+                method,
+                url,
+                headers,
+                params,
+                authorization,
+                body: body || undefined,
+                timestamp: Date.now()
+            };
+
+            // Update tab
+            tab.request = request;
+            tab.requestId = request.id;
+            tab.name = request.name;
+            tab.method = request.method;
+
+            vscode.postMessage({
+                command: 'saveToCollection',
+                request: request,
+                collectionId: tab.collectionId
+            });
+
+            renderTabs();
+        }
+
+        function sendRequest() {
+            const method = document.getElementById('method').value;
+            let url = document.getElementById('url').value;
+            const body = document.getElementById('body').value;
+            const headers = getHeaders();
+            const params = getParams();
+            let authorization = getAuthorization();
+
+            // Resolve inherited authorization
+            if (authorization && authorization.type === 'inherit') {
+                const currentTab = tabs.find(t => t.id === activeTabId);
+                const collectionId = currentTab?.collectionId;
+                if (collectionId && collectionAuthorizations[collectionId]) {
+                    authorization = collectionAuthorizations[collectionId];
+                } else {
+                    authorization = { type: 'none' };
+                }
+            }
+
+            // Add params to URL
+            const paramString = Object.entries(params).map(([k, v]) => \`\${encodeURIComponent(k)}=\${encodeURIComponent(v)}\`).join('&');
+            if (paramString) {
+                url += (url.includes('?') ? '&' : '?') + paramString;
+            }
 
             if (!url) {
                 alert('Please enter a URL');
@@ -1339,6 +1673,8 @@ export class APITestPanel {
                 method,
                 url,
                 headers,
+                params,
+                authorization,
                 body: body || undefined,
                 timestamp: Date.now()
             };
@@ -1833,6 +2169,146 @@ export class APITestPanel {
             closeEditEnvironmentModal();
         }
 
+        // Collection Authorization Modal Functions
+        function showCollectionAuthModal(collectionId) {
+            currentCollectionAuthId = collectionId;
+            const collection = collectionsData.find(c => c.id === collectionId);
+            if (!collection) return;
+
+            document.getElementById('collection-auth-name').textContent = collection.name;
+
+            // Load existing auth if available
+            const existingAuth = collectionAuthorizations[collectionId];
+            if (existingAuth) {
+                document.getElementById('collection-auth-type').value = existingAuth.type;
+                changeCollectionAuthType();
+
+                // Populate fields
+                switch(existingAuth.type) {
+                    case 'bearer':
+                        document.getElementById('collection-auth-bearer-token').value = existingAuth.token || '';
+                        break;
+                    case 'basic':
+                        document.getElementById('collection-auth-basic-username').value = existingAuth.username || '';
+                        document.getElementById('collection-auth-basic-password').value = existingAuth.password || '';
+                        break;
+                    case 'apikey':
+                        document.getElementById('collection-auth-apikey-key').value = existingAuth.key || '';
+                        document.getElementById('collection-auth-apikey-value').value = existingAuth.value || '';
+                        document.getElementById('collection-auth-apikey-location').value = existingAuth.location || 'header';
+                        break;
+                }
+            } else {
+                document.getElementById('collection-auth-type').value = 'none';
+                changeCollectionAuthType();
+            }
+
+            document.getElementById('collectionAuthModal').classList.add('show');
+        }
+
+        function closeCollectionAuthModal(event) {
+            if (!event || event.target.id === 'collectionAuthModal') {
+                document.getElementById('collectionAuthModal').classList.remove('show');
+                currentCollectionAuthId = null;
+            }
+        }
+
+        function changeCollectionAuthType() {
+            const authType = document.getElementById('collection-auth-type').value;
+            const authFields = document.getElementById('collection-auth-fields');
+            authFields.innerHTML = '';
+
+            switch(authType) {
+                case 'bearer':
+                    authFields.innerHTML = \`
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Token:</label>
+                            <input type="text" id="collection-auth-bearer-token" placeholder="Enter bearer token" style="width: 100%;">
+                        </div>
+                    \`;
+                    break;
+                case 'basic':
+                    authFields.innerHTML = \`
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Username:</label>
+                            <input type="text" id="collection-auth-basic-username" placeholder="Username" style="width: 100%; max-width: 400px;">
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Password:</label>
+                            <input type="password" id="collection-auth-basic-password" placeholder="Password" style="width: 100%; max-width: 400px;">
+                        </div>
+                    \`;
+                    break;
+                case 'apikey':
+                    authFields.innerHTML = \`
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Key:</label>
+                            <input type="text" id="collection-auth-apikey-key" placeholder="API Key name" style="width: 100%; max-width: 400px;">
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Value:</label>
+                            <input type="text" id="collection-auth-apikey-value" placeholder="API Key value" style="width: 100%; max-width: 400px;">
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Add to:</label>
+                            <select id="collection-auth-apikey-location" style="width: 100%; max-width: 400px;">
+                                <option value="header">Header</option>
+                                <option value="query">Query Params</option>
+                            </select>
+                        </div>
+                    \`;
+                    break;
+                case 'none':
+                    authFields.innerHTML = \`
+                        <div style="padding: 15px; background-color: var(--vscode-textBlockQuote-background); border-left: 3px solid var(--vscode-focusBorder); border-radius: 4px;">
+                            <p style="margin: 0; font-size: 13px;">Requests in this collection set to "Inherit" will have no authorization.</p>
+                        </div>
+                    \`;
+                    break;
+            }
+        }
+
+        function saveCollectionAuthorization() {
+            if (!currentCollectionAuthId) return;
+
+            const authType = document.getElementById('collection-auth-type').value;
+            let authorization;
+
+            switch(authType) {
+                case 'bearer':
+                    const token = document.getElementById('collection-auth-bearer-token')?.value;
+                    authorization = token ? { type: 'bearer', token } : { type: 'none' };
+                    break;
+                case 'basic':
+                    const username = document.getElementById('collection-auth-basic-username')?.value;
+                    const password = document.getElementById('collection-auth-basic-password')?.value;
+                    authorization = (username && password) ? { type: 'basic', username, password } : { type: 'none' };
+                    break;
+                case 'apikey':
+                    const key = document.getElementById('collection-auth-apikey-key')?.value;
+                    const value = document.getElementById('collection-auth-apikey-value')?.value;
+                    const location = document.getElementById('collection-auth-apikey-location')?.value;
+                    authorization = (key && value) ? { type: 'apikey', key, value, location } : { type: 'none' };
+                    break;
+                case 'none':
+                default:
+                    authorization = { type: 'none' };
+                    break;
+            }
+
+            // Store locally
+            collectionAuthorizations[currentCollectionAuthId] = authorization;
+
+            // Send to backend
+            vscode.postMessage({
+                command: 'setCollectionAuthorization',
+                collectionId: currentCollectionAuthId,
+                authorization: authorization
+            });
+
+            closeCollectionAuthModal();
+        }
+
         // Tab Management
         let tabs = [{ id: 'default', method: 'GET', name: 'New Request', request: null }];
         let activeTabId = 'default';
@@ -1947,6 +2423,7 @@ export class APITestPanel {
 
         // Context Menu
         let contextMenuTarget = null;
+        let currentCollectionAuthId = null;
 
         function showContextMenu(event, collectionId) {
             event.preventDefault();
@@ -1963,16 +2440,44 @@ export class APITestPanel {
             document.getElementById('contextMenu').style.display = 'none';
 
             switch(action) {
+                case 'setAuthorization':
+                    showCollectionAuthModal(contextMenuTarget);
+                    break;
                 case 'addRequest':
                     // Create new tab and associate with collection
                     const tabId = 'tab_' + Date.now();
+                    const requestId = 'req_' + Date.now();
+
+                    // Create a draft request that shows immediately in the collection
+                    const draftRequest = {
+                        id: requestId,
+                        name: 'New Request',
+                        method: 'GET',
+                        url: '',
+                        headers: {},
+                        params: {},
+                        authorization: { type: 'inherit' },
+                        body: undefined,
+                        timestamp: Date.now(),
+                        isDraft: true
+                    };
+
                     tabs.push({
                         id: tabId,
                         method: 'GET',
                         name: 'New Request',
-                        request: null,
+                        request: draftRequest,
+                        requestId: requestId,
                         collectionId: contextMenuTarget
                     });
+
+                    // Add draft request to collection immediately
+                    vscode.postMessage({
+                        command: 'addDraftToCollection',
+                        request: draftRequest,
+                        collectionId: contextMenuTarget
+                    });
+
                     renderTabs();
                     switchToTab(tabId);
                     break;
