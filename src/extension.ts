@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { DownloadManager } from './downloadManager';
 import { DownloadTreeProvider } from './downloadTreeProvider';
 import { ProgressPanel } from './progressPanel';
+import { FileTransferMonitor } from './fileTransferMonitor';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Download Progress Tracker extension is now active');
@@ -9,6 +10,7 @@ export function activate(context: vscode.ExtensionContext) {
     const outputChannel = vscode.window.createOutputChannel('Download Progress');
     const downloadManager = new DownloadManager(outputChannel);
     const treeProvider = new DownloadTreeProvider(downloadManager);
+    const fileTransferMonitor = new FileTransferMonitor(downloadManager, outputChannel);
 
     // Register tree view
     const treeView = vscode.window.createTreeView('downloadProgressView', {
@@ -139,6 +141,64 @@ export function activate(context: vscode.ExtensionContext) {
         }
     );
 
+    // New commands for file context menu downloads
+    const downloadFileCommand = vscode.commands.registerCommand(
+        'downloadProgress.downloadFile',
+        async (uri: vscode.Uri) => {
+            if (!uri) {
+                vscode.window.showErrorMessage('No file selected');
+                return;
+            }
+
+            outputChannel.appendLine(`Download file requested: ${uri.toString()}`);
+
+            try {
+                // Check if it's a remote file (SSH, remote, etc.)
+                const isRemote = uri.scheme !== 'file';
+
+                if (isRemote) {
+                    outputChannel.appendLine(`Detected remote file: ${uri.scheme}`);
+                    await fileTransferMonitor.downloadRemoteFile(uri);
+                } else {
+                    // For local files, offer to copy to downloads folder
+                    const action = await vscode.window.showInformationMessage(
+                        'This is a local file. Copy to downloads folder?',
+                        'Yes',
+                        'No'
+                    );
+
+                    if (action === 'Yes') {
+                        await fileTransferMonitor.downloadRemoteFile(uri);
+                    }
+                }
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                outputChannel.appendLine(`Error downloading file: ${errorMessage}`);
+                vscode.window.showErrorMessage(`Failed to download file: ${errorMessage}`);
+            }
+        }
+    );
+
+    const downloadFileToWorkspaceCommand = vscode.commands.registerCommand(
+        'downloadProgress.downloadFileToWorkspace',
+        async (uri: vscode.Uri) => {
+            if (!uri) {
+                vscode.window.showErrorMessage('No file selected');
+                return;
+            }
+
+            outputChannel.appendLine(`Download to workspace requested: ${uri.toString()}`);
+
+            try {
+                await fileTransferMonitor.downloadRemoteFile(uri);
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                outputChannel.appendLine(`Error downloading file: ${errorMessage}`);
+                vscode.window.showErrorMessage(`Failed to download file: ${errorMessage}`);
+            }
+        }
+    );
+
     context.subscriptions.push(
         treeView,
         startDownloadCommand,
@@ -148,7 +208,10 @@ export function activate(context: vscode.ExtensionContext) {
         cancelDownloadCommand,
         openFileCommand,
         revealFileCommand,
-        outputChannel
+        downloadFileCommand,
+        downloadFileToWorkspaceCommand,
+        outputChannel,
+        { dispose: () => fileTransferMonitor.dispose() }
     );
 
     // Show welcome message

@@ -53,7 +53,20 @@ code --install-extension *.vsix
 
 Then reload VS Code.
 
-## 💡 Try These Commands
+## 💡 Try These Features
+
+### 🆕 Right-Click Downloads (NEW!)
+
+1. **Right-click on any file** in Explorer
+2. Select `Download with Progress Tracker`
+3. Watch the progress with beautiful UI!
+
+Works with:
+- Local files (copies to downloads folder)
+- SSH/Remote files (downloads with progress)
+- Any file system VS Code supports
+
+### Command Palette Options
 
 Open Command Palette and try:
 
@@ -110,6 +123,9 @@ Open Command Palette and try:
 ✅ File management (open, reveal)
 ✅ Cancel downloads
 ✅ Clear completed downloads
+✅ **NEW:** Right-click context menu downloads
+✅ **NEW:** SSH/Remote file support
+✅ **NEW:** Automatic remote download detection
 
 ## 🔄 Development Workflow
 

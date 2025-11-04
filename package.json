@@ -11,7 +11,8 @@
   ],
   "activationEvents": [
     "onCommand:downloadProgress.startDownload",
-    "onCommand:downloadProgress.showProgress"
+    "onCommand:downloadProgress.showProgress",
+    "onFileSystem:*"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -27,8 +28,39 @@
       {
         "command": "downloadProgress.testDownload",
         "title": "Download Progress: Test Download (Demo)"
+      },
+      {
+        "command": "downloadProgress.downloadFile",
+        "title": "Download with Progress Tracker",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "downloadProgress.downloadFileToWorkspace",
+        "title": "Download to Workspace with Progress",
+        "icon": "$(desktop-download)"
       }
     ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "downloadProgress.downloadFile",
+          "when": "!explorerResourceIsFolder",
+          "group": "5_cutcopypaste@30"
+        },
+        {
+          "command": "downloadProgress.downloadFileToWorkspace",
+          "when": "!explorerResourceIsFolder && resourceScheme =~ /^(ssh|vscode-remote)$/",
+          "group": "5_cutcopypaste@31"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "downloadProgress.downloadFile",
+          "when": "resourceScheme =~ /^(ssh|vscode-remote|https?)$/",
+          "group": "1_download"
+        }
+      ]
+    },
     "viewsContainers": {
       "activitybar": [
         {

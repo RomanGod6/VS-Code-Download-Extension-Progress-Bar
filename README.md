@@ -12,6 +12,9 @@ A beautiful and functional VS Code extension for tracking download progress with
 - **Multiple Downloads**: Handle multiple simultaneous downloads
 - **Easy File Access**: Quick actions to open downloaded files or reveal in explorer
 - **Test Mode**: Built-in test downloads to try the extension
+- **🆕 Right-Click Downloads**: Download any file from explorer with progress tracking
+- **🆕 SSH/Remote Support**: Automatically track downloads from SSH and remote connections
+- **🆕 Context Menu Integration**: "Download with Progress Tracker" in file context menus
 
 ## Screenshots
 
@@ -64,7 +67,20 @@ Open the detailed progress panel to see:
 
 ## Usage
 
-### Starting a Download
+### Right-Click Downloads (NEW!)
+
+**Download any file with progress tracking:**
+
+1. **In Explorer**: Right-click on any file → `Download with Progress Tracker`
+2. **SSH/Remote Files**: Right-click → `Download to Workspace with Progress`
+3. **Editor Tab**: Right-click on editor tab → `Download with Progress Tracker`
+
+The extension automatically detects:
+- Remote files (SSH, Remote-SSH, Codespaces)
+- Local files (offers to copy to downloads folder)
+- File size and shows real-time progress
+
+### Starting a Download from URL
 
 1. Open Command Palette (`Cmd/Ctrl+Shift+P`)
 2. Type: `Download Progress: Start Download`
@@ -108,10 +124,18 @@ Try the extension with test files:
 
 | Command | Description |
 |---------|-------------|
-| `Download Progress: Start Download` | Start a new download |
+| `Download Progress: Start Download` | Start a new download from URL |
 | `Download Progress: Show Downloads` | Open the progress panel |
 | `Download Progress: Test Download (Demo)` | Try test downloads |
+| `Download with Progress Tracker` | Download selected file (context menu) |
+| `Download to Workspace with Progress` | Download remote file to workspace |
 | `Download Progress: Clear Completed` | Remove completed downloads from list |
+
+### Context Menu Commands
+
+Right-click on any file in the Explorer to see:
+- **Download with Progress Tracker** - Available for all files
+- **Download to Workspace with Progress** - Available for SSH/remote files
 
 ## Development Scripts
 
@@ -142,7 +166,8 @@ npm run package
 │   ├── extension.ts              # Main entry point
 │   ├── downloadManager.ts        # Download logic and state management
 │   ├── downloadTreeProvider.ts   # Sidebar tree view provider
-│   └── progressPanel.ts          # Webview panel with detailed UI
+│   ├── progressPanel.ts          # Webview panel with detailed UI
+│   └── fileTransferMonitor.ts    # File transfer and remote download handler
 ├── resources/
 │   └── download.svg              # Extension icon
 ├── scripts/
@@ -157,10 +182,16 @@ npm run package
 ## Technical Details
 
 ### Download Manager
-- Uses Node.js `https`/`http` modules for downloads
+- Uses Node.js `https`/`http` modules for URL downloads
 - Tracks progress, speed, and time estimates
 - Handles redirects automatically
 - Emits events for UI updates
+
+### File Transfer Monitor (NEW)
+- Monitors file system operations for download detection
+- Handles SSH/remote file transfers with VS Code's FileSystem API
+- Chunked reading/writing for large files with progress updates
+- Automatic scheme detection (file, ssh, vscode-remote, etc.)
 
 ### UI Components
 1. **Tree View Provider**: Sidebar integration with VS Code's tree view API
@@ -169,12 +200,14 @@ npm run package
    - Animated loading states
    - Responsive grid layout
    - Real-time statistics
+3. **Context Menus**: Integrated into Explorer and Editor contexts
 
 ### Features
 - TypeScript for type safety
 - Event-driven architecture
 - Automatic file naming
 - Workspace-aware save locations (saves to `downloads/` folder in workspace)
+- Remote file system support (SSH, Remote-SSH, Codespaces)
 - Proper cleanup and disposal
 
 ## Requirements
@@ -232,6 +265,10 @@ If you encounter any issues or have questions:
 - Test download functionality
 - File management (open, reveal in explorer)
 - Download speed and time estimates
+- Right-click context menu for downloads
+- SSH and remote file support
+- Automatic download detection for remote connections
+- File transfer monitoring
 
 ---
 
