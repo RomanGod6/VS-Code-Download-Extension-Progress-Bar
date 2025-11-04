@@ -564,9 +564,16 @@ export function activate(context: vscode.ExtensionContext) {
         { dispose: () => clipboardManager.dispose() }
     );
 
+    // Auto-open API Tester panel when extension activates
+    // Use setTimeout to ensure it opens after activation completes
+    setTimeout(() => {
+        APITestPanel.createOrShow(apiTester, environmentManager, collectionsManager, outputChannel);
+    }, 500);
+
     // Show welcome message
     outputChannel.appendLine('✓ Developer Toolbox activated successfully!');
     outputChannel.appendLine('Available utilities: Downloads, Text Tools, File Tools, Clipboard Manager, API Tester, and more!');
+    outputChannel.appendLine('💡 API Tester is now open - press Ctrl+Shift+A to reopen anytime!');
 }
 
 export function deactivate() {
