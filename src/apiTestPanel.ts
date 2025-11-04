@@ -1775,10 +1775,12 @@ export class APITestPanel {
 
             container.innerHTML = collections.map(col => \`
                 <div class="collection-item">
-                    <div class="collection-header" onclick="toggleCollection('\${col.id}')">
-                        <span class="collection-icon" id="icon-\${col.id}">▶</span>
-                        <span>📁 \${col.name}</span>
-                        <span style="opacity: 0.6; font-size: 11px; margin-left: auto;">(\${col.requestCount})</span>
+                    <div class="collection-header">
+                        <span class="collection-icon" id="icon-\${col.id}" onclick="toggleCollection(event, '\${col.id}')">▶</span>
+                        <span onclick="openCollectionDetails('\${col.id}')" style="cursor: pointer; flex: 1; display: flex; align-items: center; gap: 8px;">
+                            <span>📁 \${col.name}</span>
+                            <span style="opacity: 0.6; font-size: 11px; margin-left: auto;">(\${col.requestCount})</span>
+                        </span>
                     </div>
                     <div class="collection-requests" id="requests-\${col.id}">
                         \${col.requests && col.requests.length > 0 ? col.requests.map(req => \`
@@ -1804,7 +1806,8 @@ export class APITestPanel {
             });
         }
 
-        function toggleCollection(collectionId) {
+        function toggleCollection(event, collectionId) {
+            event.stopPropagation();
             const requestsDiv = document.getElementById('requests-' + collectionId);
             const icon = document.getElementById('icon-' + collectionId);
 
@@ -1815,6 +1818,199 @@ export class APITestPanel {
                 requestsDiv.classList.add('show');
                 icon.classList.add('expanded');
             }
+        }
+
+        function openCollectionDetails(collectionId) {
+            const collection = collectionsData.find(c => c.id === collectionId);
+            if (!collection) return;
+
+            // Get existing authorization
+            const existingAuth = collectionAuthorizations[collectionId] || { type: 'none' };
+
+            // Hide request builder, show collection details
+            const requestBuilder = document.querySelector('.request-builder');
+            requestBuilder.innerHTML = \`
+                <div style="padding: 20px;">
+                    <h2 style="margin: 0 0 20px 0; font-size: 20px; display: flex; align-items: center; gap: 10px;">
+                        <span>📁</span>
+                        <span>\${collection.name}</span>
+                    </h2>
+
+                    <div style="margin-bottom: 30px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px;">Collection Name</label>
+                        <input type="text" id="collection-name-input" value="\${collection.name}"
+                               style="width: 100%; max-width: 500px; padding: 8px 12px; background-color: var(--vscode-input-background);
+                                      color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 4px;">
+                    </div>
+
+                    <div style="margin-bottom: 30px;">
+                        <h3 style="margin: 0 0 15px 0; font-size: 16px; font-weight: 600;">Authorization</h3>
+                        <p style="font-size: 12px; opacity: 0.7; margin-bottom: 15px;">
+                            Requests in this collection set to "Inherit from Collection" will use this authorization.
+                        </p>
+
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 8px; font-weight: 600;">Type:</label>
+                            <select id="collection-detail-auth-type" onchange="changeCollectionDetailAuthType()"
+                                    style="width: 100%; max-width: 300px; padding: 6px 10px; background-color: var(--vscode-input-background);
+                                           color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 4px;">
+                                <option value="none" \${existingAuth.type === 'none' ? 'selected' : ''}>No Auth</option>
+                                <option value="bearer" \${existingAuth.type === 'bearer' ? 'selected' : ''}>Bearer Token</option>
+                                <option value="basic" \${existingAuth.type === 'basic' ? 'selected' : ''}>Basic Auth</option>
+                                <option value="apikey" \${existingAuth.type === 'apikey' ? 'selected' : ''}>API Key</option>
+                            </select>
+                        </div>
+
+                        <div id="collection-detail-auth-fields"></div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; margin-top: 30px;">
+                        <button class="send-button" onclick="saveCollectionDetails('\${collectionId}')" style="padding: 10px 20px;">
+                            💾 Save Changes
+                        </button>
+                    </div>
+                </div>
+            \`;
+
+            // Trigger auth type change to populate fields
+            changeCollectionDetailAuthType();
+
+            // Populate existing auth values
+            if (existingAuth.type !== 'none') {
+                setTimeout(() => {
+                    switch(existingAuth.type) {
+                        case 'bearer':
+                            const bearerInput = document.getElementById('collection-detail-auth-bearer-token');
+                            if (bearerInput) bearerInput.value = existingAuth.token || '';
+                            break;
+                        case 'basic':
+                            const usernameInput = document.getElementById('collection-detail-auth-basic-username');
+                            const passwordInput = document.getElementById('collection-detail-auth-basic-password');
+                            if (usernameInput) usernameInput.value = existingAuth.username || '';
+                            if (passwordInput) passwordInput.value = existingAuth.password || '';
+                            break;
+                        case 'apikey':
+                            const keyInput = document.getElementById('collection-detail-auth-apikey-key');
+                            const valueInput = document.getElementById('collection-detail-auth-apikey-value');
+                            const locationInput = document.getElementById('collection-detail-auth-apikey-location');
+                            if (keyInput) keyInput.value = existingAuth.key || '';
+                            if (valueInput) valueInput.value = existingAuth.value || '';
+                            if (locationInput) locationInput.value = existingAuth.location || 'header';
+                            break;
+                    }
+                }, 0);
+            }
+        }
+
+        function changeCollectionDetailAuthType() {
+            const authType = document.getElementById('collection-detail-auth-type').value;
+            const authFields = document.getElementById('collection-detail-auth-fields');
+            authFields.innerHTML = '';
+
+            switch(authType) {
+                case 'bearer':
+                    authFields.innerHTML = \`
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Token:</label>
+                            <input type="text" id="collection-detail-auth-bearer-token" placeholder="Enter bearer token"
+                                   style="width: 100%; max-width: 500px; padding: 8px 12px; background-color: var(--vscode-input-background);
+                                          color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 4px;">
+                        </div>
+                    \`;
+                    break;
+                case 'basic':
+                    authFields.innerHTML = \`
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Username:</label>
+                            <input type="text" id="collection-detail-auth-basic-username" placeholder="Username"
+                                   style="width: 100%; max-width: 400px; padding: 8px 12px; background-color: var(--vscode-input-background);
+                                          color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 4px;">
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Password:</label>
+                            <input type="password" id="collection-detail-auth-basic-password" placeholder="Password"
+                                   style="width: 100%; max-width: 400px; padding: 8px 12px; background-color: var(--vscode-input-background);
+                                          color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 4px;">
+                        </div>
+                    \`;
+                    break;
+                case 'apikey':
+                    authFields.innerHTML = \`
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Key:</label>
+                            <input type="text" id="collection-detail-auth-apikey-key" placeholder="API Key name"
+                                   style="width: 100%; max-width: 400px; padding: 8px 12px; background-color: var(--vscode-input-background);
+                                          color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 4px;">
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Value:</label>
+                            <input type="text" id="collection-detail-auth-apikey-value" placeholder="API Key value"
+                                   style="width: 100%; max-width: 400px; padding: 8px 12px; background-color: var(--vscode-input-background);
+                                          color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 4px;">
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Add to:</label>
+                            <select id="collection-detail-auth-apikey-location"
+                                    style="width: 100%; max-width: 400px; padding: 6px 10px; background-color: var(--vscode-input-background);
+                                           color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 4px;">
+                                <option value="header">Header</option>
+                                <option value="query">Query Params</option>
+                            </select>
+                        </div>
+                    \`;
+                    break;
+                case 'none':
+                    authFields.innerHTML = \`
+                        <div style="padding: 15px; background-color: var(--vscode-textBlockQuote-background);
+                                    border-left: 3px solid var(--vscode-focusBorder); border-radius: 4px;">
+                            <p style="margin: 0; font-size: 13px;">Requests in this collection set to "Inherit" will have no authorization.</p>
+                        </div>
+                    \`;
+                    break;
+            }
+        }
+
+        function saveCollectionDetails(collectionId) {
+            const collectionName = document.getElementById('collection-name-input').value.trim();
+            const authType = document.getElementById('collection-detail-auth-type').value;
+
+            let authorization;
+
+            switch(authType) {
+                case 'bearer':
+                    const token = document.getElementById('collection-detail-auth-bearer-token')?.value;
+                    authorization = token ? { type: 'bearer', token } : { type: 'none' };
+                    break;
+                case 'basic':
+                    const username = document.getElementById('collection-detail-auth-basic-username')?.value;
+                    const password = document.getElementById('collection-detail-auth-basic-password')?.value;
+                    authorization = (username && password) ? { type: 'basic', username, password } : { type: 'none' };
+                    break;
+                case 'apikey':
+                    const key = document.getElementById('collection-detail-auth-apikey-key')?.value;
+                    const value = document.getElementById('collection-detail-auth-apikey-value')?.value;
+                    const location = document.getElementById('collection-detail-auth-apikey-location')?.value;
+                    authorization = (key && value) ? { type: 'apikey', key, value, location } : { type: 'none' };
+                    break;
+                case 'none':
+                default:
+                    authorization = { type: 'none' };
+                    break;
+            }
+
+            // Store authorization locally
+            collectionAuthorizations[collectionId] = authorization;
+
+            // Send to backend
+            vscode.postMessage({
+                command: 'setCollectionAuthorization',
+                collectionId: collectionId,
+                authorization: authorization
+            });
+
+            // TODO: Also update collection name if changed
+            // For now, just show success message
+            alert('Collection settings saved!');
         }
 
         function loadCollectionRequest(collectionId, requestId) {
