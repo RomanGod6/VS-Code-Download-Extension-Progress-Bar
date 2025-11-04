@@ -62,59 +62,103 @@ export class DownloadManager {
             const file = fs.createWriteStream(savePath);
             const protocol = item.url.startsWith('https') ? https : http;
 
+            // Handle file stream errors
+            file.on('error', (err) => {
+                item.status = 'failed';
+                item.error = `File write error: ${err.message}`;
+                this._onDidChangeDownloads.fire();
+                this.outputChannel.appendLine(`✗ File error: ${item.fileName} - ${err.message}`);
+                vscode.window.showErrorMessage(`Download failed: ${err.message}`);
+            });
+
             const request = protocol.get(item.url, (response) => {
                 if (response.statusCode === 302 || response.statusCode === 301) {
                     // Handle redirects
                     const redirectUrl = response.headers.location;
                     if (redirectUrl) {
+                        file.close();
                         item.url = redirectUrl;
                         this.performDownload(id);
                         return;
                     }
                 }
 
+                if (response.statusCode !== 200) {
+                    file.close();
+                    item.status = 'failed';
+                    item.error = `HTTP ${response.statusCode}: ${response.statusMessage}`;
+                    this._onDidChangeDownloads.fire();
+                    this.outputChannel.appendLine(`✗ Download failed: ${item.fileName} - ${item.error}`);
+                    vscode.window.showErrorMessage(`Download failed: ${item.error}`);
+                    return;
+                }
+
                 const totalSize = parseInt(response.headers['content-length'] || '0', 10);
                 item.totalSize = totalSize;
+                this.outputChannel.appendLine(`Starting download: ${item.fileName} (${this.formatBytes(totalSize)})`);
 
                 let downloadedSize = 0;
                 let lastUpdate = Date.now();
                 let lastDownloadedSize = 0;
 
-                response.on('data', (chunk) => {
+                // Handle data chunks - write to file AND track progress
+                response.on('data', (chunk: Buffer) => {
+                    // Write chunk to file
+                    file.write(chunk);
+
+                    // Track progress
                     downloadedSize += chunk.length;
                     item.downloadedSize = downloadedSize;
 
                     const now = Date.now();
                     const timeDiff = (now - lastUpdate) / 1000; // seconds
 
-                    if (timeDiff >= 0.5) { // Update speed every 0.5 seconds
+                    if (timeDiff >= 0.2) { // Update speed every 0.2 seconds for smoother updates
                         const sizeDiff = downloadedSize - lastDownloadedSize;
                         item.speed = sizeDiff / timeDiff; // bytes per second
                         lastUpdate = now;
                         lastDownloadedSize = downloadedSize;
                         this._onDidChangeDownloads.fire();
+
+                        // Log progress periodically
+                        const progress = totalSize > 0 ? (downloadedSize / totalSize * 100).toFixed(1) : '?';
+                        this.outputChannel.appendLine(
+                            `Progress: ${progress}% - ${this.formatBytes(downloadedSize)} / ${this.formatBytes(totalSize)} @ ${this.formatSpeed(item.speed)}`
+                        );
                     }
                 });
 
-                response.pipe(file);
+                // Handle end of download
+                response.on('end', () => {
+                    file.end(() => {
+                        item.status = 'completed';
+                        item.speed = 0;
+                        item.downloadedSize = downloadedSize;
+                        this._onDidChangeDownloads.fire();
+                        this.outputChannel.appendLine(`✓ Download completed: ${item.fileName} (${this.formatBytes(downloadedSize)})`);
 
-                file.on('finish', () => {
-                    file.close();
-                    item.status = 'completed';
-                    item.speed = 0;
-                    this._onDidChangeDownloads.fire();
-                    this.outputChannel.appendLine(`✓ Download completed: ${item.fileName}`);
-                    vscode.window.showInformationMessage(
-                        `Download completed: ${item.fileName}`,
-                        'Open File',
-                        'Show in Folder'
-                    ).then(action => {
-                        if (action === 'Open File' && item.savePath) {
-                            vscode.commands.executeCommand('vscode.open', vscode.Uri.file(item.savePath));
-                        } else if (action === 'Show in Folder' && item.savePath) {
-                            vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(item.savePath));
-                        }
+                        vscode.window.showInformationMessage(
+                            `Download completed: ${item.fileName}`,
+                            'Open File',
+                            'Show in Folder'
+                        ).then(action => {
+                            if (action === 'Open File' && item.savePath) {
+                                vscode.commands.executeCommand('vscode.open', vscode.Uri.file(item.savePath));
+                            } else if (action === 'Show in Folder' && item.savePath) {
+                                vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(item.savePath));
+                            }
+                        });
                     });
+                });
+
+                // Handle response errors
+                response.on('error', (err) => {
+                    file.close();
+                    item.status = 'failed';
+                    item.error = err.message;
+                    this._onDidChangeDownloads.fire();
+                    this.outputChannel.appendLine(`✗ Response error: ${item.fileName} - ${err.message}`);
+                    vscode.window.showErrorMessage(`Download failed: ${err.message}`);
                 });
             });
 
