@@ -9,6 +9,7 @@ import { TextUtilities } from './textUtilities';
 import { FileUtilities } from './fileUtilities';
 import { QuickActionsProvider, QuickActionsUtility } from './quickActions';
 import { APITester } from './apiTester';
+import { APITestPanel } from './apiTestPanel';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Developer Toolbox extension is now active!');
@@ -308,12 +309,21 @@ export function activate(context: vscode.ExtensionContext) {
 
     const sendAPIRequestCommand = vscode.commands.registerCommand(
         'toolbox.sendAPIRequest',
-        () => apiTester.buildAndSendRequest()
+        () => {
+            APITestPanel.createOrShow(apiTester, outputChannel);
+        }
     );
 
     const detectURLsInFileCommand = vscode.commands.registerCommand(
         'toolbox.detectURLsInFile',
-        () => apiTester.detectAPIsInFile()
+        () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showWarningMessage('No active editor. Please open a file first.');
+                return;
+            }
+            apiTester.detectAPIsInFile();
+        }
     );
 
     // ===== MAIN TOOLBOX PANEL =====
