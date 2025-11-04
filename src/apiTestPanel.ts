@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 import { APITester, APIRequest, APIResponse } from './apiTester';
+import { EnvironmentManager } from './environmentManager';
+import { CollectionsManager } from './collectionsManager';
 
 export class APITestPanel {
     public static currentPanel: APITestPanel | undefined;
@@ -9,6 +11,8 @@ export class APITestPanel {
     private constructor(
         panel: vscode.WebviewPanel,
         private apiTester: APITester,
+        private environmentManager: EnvironmentManager,
+        private collectionsManager: CollectionsManager,
         private outputChannel: vscode.OutputChannel
     ) {
         this._panel = panel;
@@ -43,7 +47,12 @@ export class APITestPanel {
         this.sendHistory();
     }
 
-    public static createOrShow(apiTester: APITester, outputChannel: vscode.OutputChannel) {
+    public static createOrShow(
+        apiTester: APITester,
+        environmentManager: EnvironmentManager,
+        collectionsManager: CollectionsManager,
+        outputChannel: vscode.OutputChannel
+    ) {
         const column = vscode.ViewColumn.One;
 
         if (APITestPanel.currentPanel) {
@@ -62,7 +71,7 @@ export class APITestPanel {
             }
         );
 
-        APITestPanel.currentPanel = new APITestPanel(panel, apiTester, outputChannel);
+        APITestPanel.currentPanel = new APITestPanel(panel, apiTester, environmentManager, collectionsManager, outputChannel);
     }
 
     private sendHistory() {

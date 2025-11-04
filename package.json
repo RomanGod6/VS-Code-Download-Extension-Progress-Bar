@@ -137,6 +137,30 @@
       {
         "command": "toolbox.detectURLsInFile",
         "title": "Toolbox: Detect URLs in Current File"
+      },
+      {
+        "command": "toolbox.createEnvironment",
+        "title": "Toolbox: Create Environment"
+      },
+      {
+        "command": "toolbox.importEnvFile",
+        "title": "Toolbox: Import .env File"
+      },
+      {
+        "command": "toolbox.setActiveEnvironment",
+        "title": "Toolbox: Set Active Environment"
+      },
+      {
+        "command": "toolbox.createCollection",
+        "title": "Toolbox: Create Collection"
+      },
+      {
+        "command": "toolbox.importCollection",
+        "title": "Toolbox: Import Collection (Postman JSON)"
+      },
+      {
+        "command": "toolbox.exportCollection",
+        "title": "Toolbox: Export Collection"
       }
     ],
     "menus": {

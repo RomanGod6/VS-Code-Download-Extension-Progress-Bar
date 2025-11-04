@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as https from 'https';
 import * as http from 'http';
+import { EnvironmentManager } from './environmentManager';
 
 export interface APIRequest {
     id: string;
@@ -26,7 +27,8 @@ export class APITester {
 
     constructor(
         private outputChannel: vscode.OutputChannel,
-        private context: vscode.ExtensionContext
+        private context: vscode.ExtensionContext,
+        private environmentManager?: EnvironmentManager
     ) {
         this.loadHistory();
     }
@@ -41,29 +43,45 @@ export class APITester {
     }
 
     /**
-     * Send an API request
+     * Send an API request (with environment variable substitution)
      */
     public async sendRequest(request: APIRequest): Promise<APIResponse> {
         const startTime = Date.now();
 
+        // Substitute environment variables
+        let processedRequest = request;
+        if (this.environmentManager) {
+            processedRequest = {
+                ...request,
+                url: this.environmentManager.substituteVariables(request.url),
+                headers: Object.fromEntries(
+                    Object.entries(request.headers).map(([key, value]) => [
+                        key,
+                        this.environmentManager!.substituteVariables(value)
+                    ])
+                ),
+                body: request.body ? this.environmentManager.substituteVariables(request.body) : undefined
+            };
+        }
+
         this.outputChannel.appendLine(`\n=== API Request ===`);
-        this.outputChannel.appendLine(`${request.method} ${request.url}`);
-        this.outputChannel.appendLine(`Headers: ${JSON.stringify(request.headers, null, 2)}`);
-        if (request.body) {
-            this.outputChannel.appendLine(`Body: ${request.body}`);
+        this.outputChannel.appendLine(`${processedRequest.method} ${processedRequest.url}`);
+        this.outputChannel.appendLine(`Headers: ${JSON.stringify(processedRequest.headers, null, 2)}`);
+        if (processedRequest.body) {
+            this.outputChannel.appendLine(`Body: ${processedRequest.body}`);
         }
 
         return new Promise((resolve, reject) => {
             try {
-                const urlObj = new URL(request.url);
+                const urlObj = new URL(processedRequest.url);
                 const protocol = urlObj.protocol === 'https:' ? https : http;
 
                 const options: http.RequestOptions = {
-                    method: request.method,
+                    method: processedRequest.method,
                     hostname: urlObj.hostname,
                     port: urlObj.port,
                     path: urlObj.pathname + urlObj.search,
-                    headers: request.headers
+                    headers: processedRequest.headers
                 };
 
                 const req = protocol.request(options, (res) => {
@@ -107,8 +125,8 @@ export class APITester {
                 });
 
                 // Send body if present
-                if (request.body) {
-                    req.write(request.body);
+                if (processedRequest.body) {
+                    req.write(processedRequest.body);
                 }
 
                 req.end();

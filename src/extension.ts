@@ -10,6 +10,8 @@ import { FileUtilities } from './fileUtilities';
 import { QuickActionsProvider, QuickActionsUtility } from './quickActions';
 import { APITester } from './apiTester';
 import { APITestPanel } from './apiTestPanel';
+import { EnvironmentManager } from './environmentManager';
+import { CollectionsManager } from './collectionsManager';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Developer Toolbox extension is now active!');
@@ -23,7 +25,9 @@ export function activate(context: vscode.ExtensionContext) {
     const textUtilities = new TextUtilities(outputChannel);
     const fileUtilities = new FileUtilities(outputChannel);
     const quickActionsUtility = new QuickActionsUtility(outputChannel);
-    const apiTester = new APITester(outputChannel, context);
+    const environmentManager = new EnvironmentManager(context, context.secrets);
+    const collectionsManager = new CollectionsManager(context);
+    const apiTester = new APITester(outputChannel, context, environmentManager);
 
     // Initialize tree providers
     const downloadTreeProvider = new DownloadTreeProvider(downloadManager);
@@ -310,7 +314,7 @@ export function activate(context: vscode.ExtensionContext) {
     const sendAPIRequestCommand = vscode.commands.registerCommand(
         'toolbox.sendAPIRequest',
         () => {
-            APITestPanel.createOrShow(apiTester, outputChannel);
+            APITestPanel.createOrShow(apiTester, environmentManager, collectionsManager, outputChannel);
         }
     );
 
@@ -323,6 +327,172 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
             apiTester.detectAPIsInFile();
+        }
+    );
+
+    // ===== ENVIRONMENT COMMANDS =====
+
+    const createEnvironmentCommand = vscode.commands.registerCommand(
+        'toolbox.createEnvironment',
+        async () => {
+            const name = await vscode.window.showInputBox({
+                prompt: 'Enter environment name',
+                placeHolder: 'Development, Staging, Production, etc.'
+            });
+
+            if (name) {
+                await environmentManager.createEnvironment(name);
+                vscode.window.showInformationMessage(`Environment "${name}" created!`);
+            }
+        }
+    );
+
+    const importEnvFileCommand = vscode.commands.registerCommand(
+        'toolbox.importEnvFile',
+        async () => {
+            const environments = environmentManager.getEnvironments();
+
+            if (environments.length === 0) {
+                vscode.window.showWarningMessage('Create an environment first!');
+                return;
+            }
+
+            const selected = await vscode.window.showQuickPick(
+                environments.map(env => env.name),
+                { placeHolder: 'Select environment to import into' }
+            );
+
+            if (!selected) return;
+
+            const env = environments.find(e => e.name === selected);
+            if (!env) return;
+
+            const files = await vscode.window.showOpenDialog({
+                canSelectMany: false,
+                filters: { 'Environment Files': ['env'] },
+                openLabel: 'Import .env File'
+            });
+
+            if (!files || files.length === 0) return;
+
+            const content = await vscode.workspace.fs.readFile(files[0]);
+            const textContent = Buffer.from(content).toString('utf8');
+
+            const imported = await environmentManager.importFromEnvFile(env.id, textContent);
+
+            vscode.window.showInformationMessage(`Imported ${imported} variables into "${env.name}"!`);
+            outputChannel.appendLine(`✓ Imported ${imported} variables from ${files[0].fsPath}`);
+        }
+    );
+
+    const setActiveEnvironmentCommand = vscode.commands.registerCommand(
+        'toolbox.setActiveEnvironment',
+        async () => {
+            const environments = environmentManager.getEnvironments();
+
+            if (environments.length === 0) {
+                vscode.window.showWarningMessage('No environments created yet!');
+                return;
+            }
+
+            const items = [
+                { label: '$(circle-slash) None', description: 'No environment', id: undefined },
+                ...environments.map(env => ({
+                    label: env.name,
+                    description: `${Object.keys(env.variables).length} variables`,
+                    id: env.id
+                }))
+            ];
+
+            const selected = await vscode.window.showQuickPick(items, {
+                placeHolder: 'Select active environment'
+            });
+
+            if (selected) {
+                await environmentManager.setActiveEnvironment(selected.id);
+                const envName = selected.id ? selected.label : 'None';
+                vscode.window.showInformationMessage(`Active environment: ${envName}`);
+            }
+        }
+    );
+
+    // ===== COLLECTION COMMANDS =====
+
+    const createCollectionCommand = vscode.commands.registerCommand(
+        'toolbox.createCollection',
+        async () => {
+            const name = await vscode.window.showInputBox({
+                prompt: 'Enter collection name',
+                placeHolder: 'My API Collection'
+            });
+
+            if (name) {
+                const description = await vscode.window.showInputBox({
+                    prompt: 'Enter description (optional)',
+                    placeHolder: 'Collection description'
+                });
+
+                await collectionsManager.createCollection(name, description);
+                vscode.window.showInformationMessage(`Collection "${name}" created!`);
+            }
+        }
+    );
+
+    const importCollectionCommand = vscode.commands.registerCommand(
+        'toolbox.importCollection',
+        async () => {
+            const files = await vscode.window.showOpenDialog({
+                canSelectMany: false,
+                filters: { 'JSON Files': ['json'] },
+                openLabel: 'Import Collection'
+            });
+
+            if (!files || files.length === 0) return;
+
+            const content = await vscode.workspace.fs.readFile(files[0]);
+            const textContent = Buffer.from(content).toString('utf8');
+
+            const collection = await collectionsManager.importCollection(textContent);
+
+            if (collection) {
+                vscode.window.showInformationMessage(`Collection "${collection.name}" imported!`);
+            } else {
+                vscode.window.showErrorMessage('Failed to import collection');
+            }
+        }
+    );
+
+    const exportCollectionCommand = vscode.commands.registerCommand(
+        'toolbox.exportCollection',
+        async () => {
+            const collections = collectionsManager.getCollections();
+
+            if (collections.length === 0) {
+                vscode.window.showWarningMessage('No collections to export!');
+                return;
+            }
+
+            const selected = await vscode.window.showQuickPick(
+                collections.map(c => c.name),
+                { placeHolder: 'Select collection to export' }
+            );
+
+            if (!selected) return;
+
+            const collection = collections.find(c => c.name === selected);
+            if (!collection) return;
+
+            const json = collectionsManager.exportCollection(collection.id);
+
+            const uri = await vscode.window.showSaveDialog({
+                defaultUri: vscode.Uri.file(`${collection.name}.json`),
+                filters: { 'JSON Files': ['json'] }
+            });
+
+            if (uri) {
+                await vscode.workspace.fs.writeFile(uri, Buffer.from(json, 'utf8'));
+                vscode.window.showInformationMessage(`Collection exported to ${uri.fsPath}`);
+            }
         }
     );
 
@@ -382,6 +552,12 @@ export function activate(context: vscode.ExtensionContext) {
         clipboardClearCommand,
         sendAPIRequestCommand,
         detectURLsInFileCommand,
+        createEnvironmentCommand,
+        importEnvFileCommand,
+        setActiveEnvironmentCommand,
+        createCollectionCommand,
+        importCollectionCommand,
+        exportCollectionCommand,
         showPanelCommand,
         outputChannel,
         { dispose: () => fileTransferMonitor.dispose() },
