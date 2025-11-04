@@ -139,6 +139,11 @@
         "title": "Toolbox: Detect URLs in Current File"
       },
       {
+        "command": "toolbox.sendAPIRequest",
+        "title": "Toolbox: Open API Tester",
+        "icon": "$(globe)"
+      },
+      {
         "command": "toolbox.createEnvironment",
         "title": "Toolbox: Create Environment"
       },
@@ -238,7 +243,15 @@
           "description": "Show download button above URLs in code"
         }
       }
-    }
+    },
+    "keybindings": [
+      {
+        "command": "toolbox.sendAPIRequest",
+        "key": "ctrl+shift+a",
+        "mac": "cmd+shift+a",
+        "when": "editorTextFocus"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

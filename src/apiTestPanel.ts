@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { APITester, APIRequest, APIResponse } from './apiTester';
-import { EnvironmentManager } from './environmentManager';
-import { CollectionsManager } from './collectionsManager';
+import { EnvironmentManager, Environment } from './environmentManager';
+import { CollectionsManager, Collection } from './collectionsManager';
 
 export class APITestPanel {
     public static currentPanel: APITestPanel | undefined;
@@ -37,14 +37,30 @@ export class APITestPanel {
                     case 'clearHistory':
                         // TODO: Implement clear history
                         break;
+                    case 'loadEnvironments':
+                        this.sendEnvironments();
+                        break;
+                    case 'loadCollections':
+                        this.sendCollections();
+                        break;
+                    case 'setActiveEnvironment':
+                        await this.environmentManager.setActiveEnvironment(message.environmentId);
+                        this.sendEnvironments();
+                        vscode.window.showInformationMessage(`Environment switched successfully`);
+                        break;
+                    case 'saveToCollection':
+                        await this.handleSaveToCollection(message.request, message.collectionId);
+                        break;
                 }
             },
             null,
             this._disposables
         );
 
-        // Send initial history
+        // Send initial data
         this.sendHistory();
+        this.sendEnvironments();
+        this.sendCollections();
     }
 
     public static createOrShow(
@@ -111,6 +127,41 @@ export class APITestPanel {
                 command: 'requestError',
                 error: errorMessage
             });
+        }
+    }
+
+    private sendEnvironments() {
+        const environments = this.environmentManager.getEnvironments();
+        const activeEnv = this.environmentManager.getActiveEnvironment();
+        this._panel.webview.postMessage({
+            command: 'updateEnvironments',
+            environments: environments.map((env: Environment) => ({
+                id: env.id,
+                name: env.name,
+                isActive: env.id === activeEnv?.id
+            }))
+        });
+    }
+
+    private sendCollections() {
+        const collections = this.collectionsManager.getCollections();
+        this._panel.webview.postMessage({
+            command: 'updateCollections',
+            collections: collections.map((col: Collection) => ({
+                id: col.id,
+                name: col.name,
+                requestCount: col.requests.length
+            }))
+        });
+    }
+
+    private async handleSaveToCollection(request: APIRequest, collectionId: string) {
+        try {
+            this.collectionsManager.addRequestToCollection(collectionId, request);
+            vscode.window.showInformationMessage(`Request saved to collection!`);
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            vscode.window.showErrorMessage(`Failed to save request: ${errorMessage}`);
         }
     }
 
@@ -427,6 +478,67 @@ export class APITestPanel {
             font-size: 12px;
             margin-top: 10px;
         }
+
+        .control-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+            padding: 12px;
+            background-color: var(--vscode-sideBar-background);
+            border-radius: 6px;
+            border: 1px solid var(--vscode-panel-border);
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-label {
+            font-size: 12px;
+            font-weight: 600;
+            opacity: 0.8;
+            white-space: nowrap;
+        }
+
+        .control-select {
+            min-width: 150px;
+        }
+
+        .save-button {
+            background-color: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+            white-space: nowrap;
+        }
+
+        .save-button:hover {
+            background-color: var(--vscode-button-secondaryHoverBackground);
+        }
+
+        .variable-hint {
+            font-size: 11px;
+            opacity: 0.7;
+            font-style: italic;
+            margin-top: 8px;
+            padding: 8px 12px;
+            background-color: var(--vscode-textCodeBlock-background);
+            border-radius: 4px;
+            border-left: 3px solid var(--vscode-focusBorder);
+        }
+
+        .variable-example {
+            font-family: 'Consolas', 'Monaco', monospace;
+            color: var(--vscode-textLink-foreground);
+        }
     </style>
 </head>
 <body>
@@ -440,6 +552,26 @@ export class APITestPanel {
             <div class="request-header">
                 <span class="request-header-icon">🌐</span>
                 API Tester
+            </div>
+
+            <div class="control-bar">
+                <div class="control-group">
+                    <span class="control-label">🌍 Environment:</span>
+                    <select id="environment" class="control-select" onchange="changeEnvironment()">
+                        <option value="">No environment</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <span class="control-label">📁 Collection:</span>
+                    <select id="collection" class="control-select">
+                        <option value="">Select collection...</option>
+                    </select>
+                    <button class="save-button" onclick="saveToCollection()">💾 Save</button>
+                </div>
+            </div>
+
+            <div class="variable-hint">
+                💡 Tip: Use <span class="variable-example">{{VARIABLE}}</span> in URL, headers, or body to substitute environment variables
             </div>
 
             <div class="request-line">
@@ -503,6 +635,12 @@ export class APITestPanel {
                     break;
                 case 'loadRequest':
                     loadRequest(message.request);
+                    break;
+                case 'updateEnvironments':
+                    renderEnvironments(message.environments);
+                    break;
+                case 'updateCollections':
+                    renderCollections(message.collections);
                     break;
             }
         });
@@ -715,8 +853,79 @@ export class APITestPanel {
                 .replace(/'/g, '&#039;');
         }
 
-        // Load history on start
+        function renderEnvironments(environments) {
+            const select = document.getElementById('environment');
+            select.innerHTML = '<option value="">No environment</option>';
+
+            environments.forEach(env => {
+                const option = document.createElement('option');
+                option.value = env.id;
+                option.textContent = env.name + (env.isActive ? ' ✓' : '');
+                option.selected = env.isActive;
+                select.appendChild(option);
+            });
+        }
+
+        function renderCollections(collections) {
+            const select = document.getElementById('collection');
+            select.innerHTML = '<option value="">Select collection...</option>';
+
+            collections.forEach(col => {
+                const option = document.createElement('option');
+                option.value = col.id;
+                option.textContent = \`\${col.name} (\${col.requestCount})\`;
+                select.appendChild(option);
+            });
+        }
+
+        function changeEnvironment() {
+            const environmentId = document.getElementById('environment').value;
+            if (environmentId) {
+                vscode.postMessage({
+                    command: 'setActiveEnvironment',
+                    environmentId: environmentId
+                });
+            }
+        }
+
+        function saveToCollection() {
+            const collectionId = document.getElementById('collection').value;
+            if (!collectionId) {
+                alert('Please select a collection first');
+                return;
+            }
+
+            const method = document.getElementById('method').value;
+            const url = document.getElementById('url').value;
+            const body = document.getElementById('body').value;
+            const headers = getHeaders();
+
+            if (!url) {
+                alert('Please enter a URL');
+                return;
+            }
+
+            const request = {
+                id: Date.now().toString(),
+                name: method + ' ' + url,
+                method,
+                url,
+                headers,
+                body: body || undefined,
+                timestamp: Date.now()
+            };
+
+            vscode.postMessage({
+                command: 'saveToCollection',
+                request: request,
+                collectionId: collectionId
+            });
+        }
+
+        // Load initial data on start
         vscode.postMessage({ command: 'loadHistory' });
+        vscode.postMessage({ command: 'loadEnvironments' });
+        vscode.postMessage({ command: 'loadCollections' });
     </script>
 </body>
 </html>`;
