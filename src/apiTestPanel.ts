@@ -83,6 +83,12 @@ export class APITestPanel {
                     case 'createEnvironment':
                         await this.handleCreateEnvironment(message.name, message.variables);
                         break;
+                    case 'getEnvironmentVariables':
+                        await this.handleGetEnvironmentVariables(message.environmentId);
+                        break;
+                    case 'updateEnvironmentVariables':
+                        await this.handleUpdateEnvironmentVariables(message.environmentId, message.variables);
+                        break;
                 }
             },
             null,
@@ -220,6 +226,56 @@ export class APITestPanel {
         }
     }
 
+    private async handleGetEnvironmentVariables(environmentId: string) {
+        try {
+            const environments = this.environmentManager.getEnvironments();
+            const env = environments.find(e => e.id === environmentId);
+
+            if (env) {
+                // Convert variables object to array for the UI
+                const variablesArray = Object.entries(env.variables).map(([key, variable]) => ({
+                    key: variable.key,
+                    value: variable.value,
+                    isSecret: variable.isSecret
+                }));
+
+                this._panel.webview.postMessage({
+                    command: 'loadEnvironmentVariables',
+                    variables: variablesArray
+                });
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            vscode.window.showErrorMessage(`Failed to load environment variables: ${errorMessage}`);
+        }
+    }
+
+    private async handleUpdateEnvironmentVariables(environmentId: string, variables: { key: string; value: string; isSecret: boolean }[]) {
+        try {
+            // Clear existing variables
+            const env = this.environmentManager.getEnvironments().find(e => e.id === environmentId);
+            if (env) {
+                // Remove all existing variables
+                for (const key of Object.keys(env.variables)) {
+                    await this.environmentManager.deleteVariable(environmentId, key);
+                }
+
+                // Add new variables
+                for (const variable of variables) {
+                    if (variable.key) {
+                        await this.environmentManager.setVariable(environmentId, variable.key, variable.value, variable.isSecret);
+                    }
+                }
+
+                vscode.window.showInformationMessage('Environment variables updated successfully!');
+                this.sendEnvironments();
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            vscode.window.showErrorMessage(`Failed to update environment variables: ${errorMessage}`);
+        }
+    }
+
     public dispose() {
         APITestPanel.currentPanel = undefined;
         this._panel.dispose();
@@ -330,20 +386,110 @@ export class APITestPanel {
             background-color: var(--vscode-button-secondaryHoverBackground);
         }
 
-        .add-env-btn {
-            background-color: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
-            border: none;
-            padding: 6px 12px;
+        .env-add-btn, .env-edit-btn {
+            background-color: transparent;
+            color: var(--vscode-foreground);
+            border: 1px solid var(--vscode-input-border);
+            padding: 4px 8px;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 12px;
-            font-weight: 500;
-            margin-left: 8px;
+            font-size: 14px;
+            margin-left: 6px;
+            transition: all 0.2s;
         }
 
-        .add-env-btn:hover {
-            background-color: var(--vscode-button-hoverBackground);
+        .env-add-btn:hover, .env-edit-btn:hover {
+            background-color: var(--vscode-list-hoverBackground);
+            border-color: var(--vscode-focusBorder);
+        }
+
+        /* Tabs Bar */
+        .tabs-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 15px;
+            background-color: var(--vscode-sideBar-background);
+            border-bottom: 1px solid var(--vscode-panel-border);
+            overflow-x: auto;
+        }
+
+        .request-tabs {
+            display: flex;
+            gap: 5px;
+            flex: 1;
+            overflow-x: auto;
+        }
+
+        .request-tab {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background-color: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 4px 4px 0 0;
+            cursor: pointer;
+            font-size: 12px;
+            min-width: 150px;
+            transition: all 0.2s;
+        }
+
+        .request-tab:hover {
+            background-color: var(--vscode-list-hoverBackground);
+        }
+
+        .request-tab.active {
+            background-color: var(--vscode-editor-background);
+            border-bottom-color: var(--vscode-editor-background);
+            font-weight: 600;
+        }
+
+        .tab-method {
+            font-weight: 600;
+            font-size: 10px;
+            padding: 2px 5px;
+            border-radius: 3px;
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .tab-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .tab-close {
+            background: none;
+            border: none;
+            color: var(--vscode-foreground);
+            cursor: pointer;
+            padding: 0 4px;
+            font-size: 16px;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+
+        .tab-close:hover {
+            opacity: 1;
+            color: var(--vscode-errorForeground);
+        }
+
+        .new-tab-btn {
+            background-color: transparent;
+            color: var(--vscode-foreground);
+            border: 1px solid var(--vscode-input-border);
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .new-tab-btn:hover {
+            background-color: var(--vscode-list-hoverBackground);
         }
 
         /* Main Container */
@@ -789,6 +935,33 @@ export class APITestPanel {
             opacity: 0.6;
             margin-top: 5px;
         }
+
+        /* Context Menu */
+        .context-menu {
+            position: fixed;
+            background-color: var(--vscode-menu-background);
+            border: 1px solid var(--vscode-menu-border);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            padding: 4px 0;
+            z-index: 10000;
+            min-width: 180px;
+        }
+
+        .context-menu-item {
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--vscode-menu-foreground);
+        }
+
+        .context-menu-item:hover {
+            background-color: var(--vscode-menu-selectionBackground);
+            color: var(--vscode-menu-selectionForeground);
+        }
     </style>
 </head>
 <body>
@@ -806,12 +979,25 @@ export class APITestPanel {
                 <select id="environment" onchange="changeEnvironment()">
                     <option value="">No Environment</option>
                 </select>
-                <button class="add-env-btn" onclick="showAddEnvironmentModal()" title="Add Environment">+ Add</button>
+                <button class="env-add-btn" onclick="showAddEnvironmentModal()" title="Add Environment">+</button>
+                <button class="env-edit-btn" id="env-edit-btn" onclick="showEditEnvironmentModal()" title="Edit Environment" style="display: none;">👁️</button>
             </div>
             <button class="history-btn" onclick="showHistoryModal()">
                 📜 History
             </button>
         </div>
+    </div>
+
+    <!-- Tabs Bar -->
+    <div class="tabs-bar" id="tabs-bar">
+        <div class="request-tabs" id="request-tabs">
+            <div class="request-tab active" data-tab-id="default">
+                <span class="tab-method">GET</span>
+                <span class="tab-name">New Request</span>
+                <button class="tab-close" onclick="closeTab(event, 'default')" style="display: none;">×</button>
+            </div>
+        </div>
+        <button class="new-tab-btn" onclick="createNewTab()" title="New Request">+</button>
     </div>
 
     <!-- Main Container -->
@@ -934,6 +1120,46 @@ export class APITestPanel {
         </div>
     </div>
 
+    <!-- Edit Environment Modal -->
+    <div id="editEnvironmentModal" class="modal" onclick="closeEditEnvironmentModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">⚙️ Edit Environment</div>
+                <button class="close-btn" onclick="closeEditEnvironmentModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Environment: <span id="edit-env-name" style="color: var(--vscode-focusBorder);"></span></label>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Variables:</label>
+                    <div id="edit-env-variables-grid" style="display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 10px; margin-bottom: 10px;">
+                    </div>
+                    <button class="add-header-btn" onclick="addEditEnvironmentVariable()">+ Add Variable</button>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button class="save-button" onclick="closeEditEnvironmentModal()">Cancel</button>
+                    <button class="send-button" onclick="saveEnvironmentChanges()">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Context Menu -->
+    <div id="contextMenu" class="context-menu" style="display: none;">
+        <div class="context-menu-item" onclick="handleContextMenuAction('addRequest')">
+            <span>➕ Add Request</span>
+        </div>
+        <div class="context-menu-item" onclick="handleContextMenuAction('renameCollection')">
+            <span>✏️ Rename</span>
+        </div>
+        <div class="context-menu-item" onclick="handleContextMenuAction('deleteCollection')">
+            <span>🗑️ Delete</span>
+        </div>
+    </div>
+
     <script>
         const vscode = acquireVsCodeApi();
         let currentTab = 'headers';
@@ -966,8 +1192,83 @@ export class APITestPanel {
                     renderCollections(message.collections);
                     renderCollectionSelector(message.collections);
                     break;
+                case 'loadEnvironmentVariables':
+                    populateEnvironmentEditor(message.variables);
+                    break;
             }
         });
+
+        function populateEnvironmentEditor(variables) {
+            const grid = document.getElementById('edit-env-variables-grid');
+            grid.innerHTML = '';
+
+            variables.forEach(variable => {
+                const keyInput = document.createElement('input');
+                keyInput.type = 'text';
+                keyInput.className = 'env-var-key';
+                keyInput.value = variable.key;
+
+                const valueInput = document.createElement('input');
+                valueInput.type = 'text';
+                valueInput.className = 'env-var-value';
+                valueInput.value = variable.isSecret ? '••••••••' : variable.value;
+                valueInput.dataset.originalValue = variable.value;
+
+                const secretLabel = document.createElement('label');
+                secretLabel.style.display = 'flex';
+                secretLabel.style.alignItems = 'center';
+                secretLabel.style.gap = '5px';
+                secretLabel.style.fontSize = '12px';
+
+                const secretCheckbox = document.createElement('input');
+                secretCheckbox.type = 'checkbox';
+                secretCheckbox.className = 'env-var-secret';
+                secretCheckbox.checked = variable.isSecret;
+
+                // When secret is checked, mask the value
+                secretCheckbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        if (valueInput.value !== '••••••••') {
+                            valueInput.dataset.originalValue = valueInput.value;
+                        }
+                        valueInput.value = '••••••••';
+                        valueInput.type = 'password';
+                    } else {
+                        valueInput.value = valueInput.dataset.originalValue || '';
+                        valueInput.type = 'text';
+                    }
+                });
+
+                // Reveal value when typing in a masked field
+                valueInput.addEventListener('focus', function() {
+                    if (this.value === '••••••••') {
+                        this.value = this.dataset.originalValue || '';
+                        this.type = 'text';
+                    }
+                });
+
+                const secretSpan = document.createElement('span');
+                secretSpan.textContent = 'Secret';
+
+                secretLabel.appendChild(secretCheckbox);
+                secretLabel.appendChild(secretSpan);
+
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'remove-btn';
+                removeBtn.textContent = '×';
+                removeBtn.onclick = function() {
+                    keyInput.remove();
+                    valueInput.remove();
+                    secretLabel.remove();
+                    removeBtn.remove();
+                };
+
+                grid.appendChild(keyInput);
+                grid.appendChild(valueInput);
+                grid.appendChild(secretLabel);
+                grid.appendChild(removeBtn);
+            });
+        }
 
         function switchTab(tab) {
             currentTab = tab;
@@ -1428,6 +1729,350 @@ export class APITestPanel {
             });
 
             closeAddEnvironmentModal();
+        }
+
+        // Environment Editor Functions
+        let currentEnvironmentId = null;
+
+        function showEditEnvironmentModal() {
+            const select = document.getElementById('environment');
+            const environmentId = select.value;
+            if (!environmentId) return;
+
+            currentEnvironmentId = environmentId;
+            const environmentName = select.options[select.selectedIndex].text.replace(' ✓', '');
+
+            document.getElementById('edit-env-name').textContent = environmentName;
+
+            // Request environment details from backend
+            vscode.postMessage({
+                command: 'getEnvironmentVariables',
+                environmentId: environmentId
+            });
+
+            document.getElementById('editEnvironmentModal').classList.add('show');
+        }
+
+        function closeEditEnvironmentModal(event) {
+            if (!event || event.target.id === 'editEnvironmentModal') {
+                document.getElementById('editEnvironmentModal').classList.remove('show');
+                currentEnvironmentId = null;
+            }
+        }
+
+        function addEditEnvironmentVariable() {
+            const grid = document.getElementById('edit-env-variables-grid');
+
+            const keyInput = document.createElement('input');
+            keyInput.type = 'text';
+            keyInput.className = 'env-var-key';
+            keyInput.placeholder = 'Variable name';
+
+            const valueInput = document.createElement('input');
+            valueInput.type = 'text';
+            valueInput.className = 'env-var-value';
+            valueInput.placeholder = 'Variable value';
+
+            const secretLabel = document.createElement('label');
+            secretLabel.style.display = 'flex';
+            secretLabel.style.alignItems = 'center';
+            secretLabel.style.gap = '5px';
+            secretLabel.style.fontSize = '12px';
+
+            const secretCheckbox = document.createElement('input');
+            secretCheckbox.type = 'checkbox';
+            secretCheckbox.className = 'env-var-secret';
+
+            const secretSpan = document.createElement('span');
+            secretSpan.textContent = 'Secret';
+
+            secretLabel.appendChild(secretCheckbox);
+            secretLabel.appendChild(secretSpan);
+
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'remove-btn';
+            removeBtn.textContent = '×';
+            removeBtn.onclick = function() {
+                keyInput.remove();
+                valueInput.remove();
+                secretLabel.remove();
+                removeBtn.remove();
+            };
+
+            grid.appendChild(keyInput);
+            grid.appendChild(valueInput);
+            grid.appendChild(secretLabel);
+            grid.appendChild(removeBtn);
+        }
+
+        function saveEnvironmentChanges() {
+            if (!currentEnvironmentId) return;
+
+            const grid = document.getElementById('edit-env-variables-grid');
+            const keys = grid.querySelectorAll('.env-var-key');
+            const values = grid.querySelectorAll('.env-var-value');
+            const secrets = grid.querySelectorAll('.env-var-secret');
+
+            const variables = [];
+            for (let i = 0; i < keys.length; i++) {
+                const key = keys[i].value.trim();
+                const value = values[i].value.trim();
+                const isSecret = secrets[i].checked;
+
+                if (key) {
+                    variables.push({ key, value, isSecret });
+                }
+            }
+
+            vscode.postMessage({
+                command: 'updateEnvironmentVariables',
+                environmentId: currentEnvironmentId,
+                variables: variables
+            });
+
+            closeEditEnvironmentModal();
+        }
+
+        // Tab Management
+        let tabs = [{ id: 'default', method: 'GET', name: 'New Request', request: null }];
+        let activeTabId = 'default';
+
+        function createNewTab() {
+            const tabId = 'tab_' + Date.now();
+            tabs.push({ id: tabId, method: 'GET', name: 'New Request', request: null });
+            renderTabs();
+            switchToTab(tabId);
+        }
+
+        function closeTab(event, tabId) {
+            event.stopPropagation();
+            if (tabs.length === 1) return; // Keep at least one tab
+
+            const index = tabs.findIndex(t => t.id === tabId);
+            if (index === -1) return;
+
+            tabs.splice(index, 1);
+
+            if (activeTabId === tabId) {
+                // Switch to previous or first tab
+                activeTabId = tabs[Math.max(0, index - 1)].id;
+            }
+
+            renderTabs();
+            loadTabContent(activeTabId);
+        }
+
+        function switchToTab(tabId) {
+            // Save current tab state before switching
+            saveCurrentTabState();
+
+            activeTabId = tabId;
+            renderTabs();
+            loadTabContent(tabId);
+        }
+
+        function saveCurrentTabState() {
+            const tab = tabs.find(t => t.id === activeTabId);
+            if (!tab) return;
+
+            tab.method = document.getElementById('method').value;
+            tab.name = document.getElementById('url').value || 'New Request';
+            tab.request = {
+                method: document.getElementById('method').value,
+                url: document.getElementById('url').value,
+                headers: getHeaders(),
+                body: document.getElementById('body').value
+            };
+        }
+
+        function loadTabContent(tabId) {
+            const tab = tabs.find(t => t.id === tabId);
+            if (!tab || !tab.request) {
+                // Clear form
+                document.getElementById('method').value = tab?.method || 'GET';
+                document.getElementById('url').value = '';
+                document.getElementById('body').value = '';
+                return;
+            }
+
+            document.getElementById('method').value = tab.request.method;
+            document.getElementById('url').value = tab.request.url;
+            document.getElementById('body').value = tab.request.body || '';
+
+            // Load headers
+            const grid = document.getElementById('headers-grid');
+            grid.innerHTML = '';
+
+            Object.entries(tab.request.headers || {}).forEach(([key, value]) => {
+                const keyInput = document.createElement('input');
+                keyInput.type = 'text';
+                keyInput.className = 'header-input';
+                keyInput.value = key;
+
+                const valueInput = document.createElement('input');
+                valueInput.type = 'text';
+                valueInput.className = 'header-input';
+                valueInput.value = value;
+
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'remove-btn';
+                removeBtn.textContent = '×';
+                removeBtn.onclick = function() {
+                    keyInput.remove();
+                    valueInput.remove();
+                    removeBtn.remove();
+                };
+
+                grid.appendChild(keyInput);
+                grid.appendChild(valueInput);
+                grid.appendChild(removeBtn);
+            });
+        }
+
+        function renderTabs() {
+            const container = document.getElementById('request-tabs');
+            container.innerHTML = tabs.map(tab => \`
+                <div class="request-tab \${tab.id === activeTabId ? 'active' : ''}" onclick="switchToTab('\${tab.id}')">
+                    <span class="tab-method method-\${tab.method}">\${tab.method}</span>
+                    <span class="tab-name">\${truncate(tab.name, 20)}</span>
+                    \${tabs.length > 1 ? \`<button class="tab-close" onclick="closeTab(event, '\${tab.id}')">×</button>\` : ''}
+                </div>
+            \`).join('');
+        }
+
+        function truncate(str, length) {
+            if (!str || str.length <= length) return str || 'New Request';
+            return str.substring(0, length) + '...';
+        }
+
+        // Context Menu
+        let contextMenuTarget = null;
+
+        function showContextMenu(event, collectionId) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            contextMenuTarget = collectionId;
+            const menu = document.getElementById('contextMenu');
+            menu.style.display = 'block';
+            menu.style.left = event.pageX + 'px';
+            menu.style.top = event.pageY + 'px';
+        }
+
+        function handleContextMenuAction(action) {
+            document.getElementById('contextMenu').style.display = 'none';
+
+            switch(action) {
+                case 'addRequest':
+                    // Create new tab and associate with collection
+                    const tabId = 'tab_' + Date.now();
+                    tabs.push({
+                        id: tabId,
+                        method: 'GET',
+                        name: 'New Request',
+                        request: null,
+                        collectionId: contextMenuTarget
+                    });
+                    renderTabs();
+                    switchToTab(tabId);
+                    break;
+                case 'renameCollection':
+                    // TODO: Implement rename
+                    alert('Rename feature coming soon!');
+                    break;
+                case 'deleteCollection':
+                    // TODO: Implement delete
+                    if (confirm('Delete this collection?')) {
+                        alert('Delete feature coming soon!');
+                    }
+                    break;
+            }
+
+            contextMenuTarget = null;
+        }
+
+        // Hide context menu when clicking elsewhere
+        document.addEventListener('click', function() {
+            document.getElementById('contextMenu').style.display = 'none';
+        });
+
+        // Update environment selector to show/hide edit button
+        function changeEnvironment() {
+            const select = document.getElementById('environment');
+            const environmentId = select.value;
+            const environmentName = select.options[select.selectedIndex].text.replace(' ✓', '');
+            const editBtn = document.getElementById('env-edit-btn');
+
+            if (environmentId) {
+                editBtn.style.display = 'inline-block';
+            } else {
+                editBtn.style.display = 'none';
+            }
+
+            vscode.postMessage({
+                command: 'setActiveEnvironment',
+                environmentId: environmentId,
+                environmentName: environmentName
+            });
+        }
+
+        // Update renderCollections to include context menu
+        function renderCollectionsOriginal(collections) {
+            const container = document.getElementById('collections-list');
+
+            if (!collections || collections.length === 0) {
+                container.innerHTML = \`
+                    <div class="empty-state">
+                        <div>No collections yet</div>
+                        <div style="margin-top: 10px; font-size: 11px;">Create a collection to organize your requests</div>
+                    </div>
+                \`;
+                return;
+            }
+
+            container.innerHTML = collections.map(col => \`
+                <div class="collection-item">
+                    <div class="collection-header" onclick="toggleCollection('\${col.id}')" oncontextmenu="showContextMenu(event, '\${col.id}')">
+                        <span class="collection-icon" id="icon-\${col.id}">▶</span>
+                        <span>📁 \${col.name}</span>
+                        <span style="opacity: 0.6; font-size: 11px; margin-left: auto;">(\${col.requestCount})</span>
+                    </div>
+                    <div class="collection-requests" id="requests-\${col.id}">
+                        \${col.requests && col.requests.length > 0 ? col.requests.map(req => \`
+                            <div class="request-item" onclick="loadCollectionRequestToTab('\${col.id}', '\${req.id}')">
+                                <span class="request-method method-\${req.method}">\${req.method}</span>
+                                <span>\${req.name || req.url}</span>
+                            </div>
+                        \`).join('') : '<div class="empty-state" style="padding: 20px 10px;">No requests</div>'}
+                    </div>
+                </div>
+            \`).join('');
+        }
+
+        // Override renderCollections
+        const originalRenderCollections = renderCollections;
+        renderCollections = renderCollectionsOriginal;
+
+        function loadCollectionRequestToTab(collectionId, requestId) {
+            // Create new tab with the request
+            const tabId = 'tab_' + Date.now();
+            tabs.push({
+                id: tabId,
+                method: 'GET',
+                name: 'Loading...',
+                request: null,
+                collectionId: collectionId,
+                requestId: requestId
+            });
+            renderTabs();
+            switchToTab(tabId);
+
+            // Load the request
+            vscode.postMessage({
+                command: 'loadCollectionRequest',
+                collectionId: collectionId,
+                requestId: requestId
+            });
         }
 
         // Load initial data
