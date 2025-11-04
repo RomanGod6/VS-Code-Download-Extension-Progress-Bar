@@ -1035,7 +1035,7 @@ export class APITestPanel {
                     <option value="">No Environment</option>
                 </select>
                 <button class="env-add-btn" onclick="showAddEnvironmentModal()" title="Add Environment">+</button>
-                <button class="env-edit-btn" id="env-edit-btn" onclick="showEditEnvironmentModal()" title="Edit Environment" style="display: none;">👁️</button>
+                <button class="env-add-btn" onclick="showManageEnvironmentsModal()" title="Manage Environments">⚙️</button>
             </div>
             <button class="history-btn" onclick="showHistoryModal()">
                 📜 History
@@ -1265,6 +1265,31 @@ export class APITestPanel {
                 <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
                     <button class="save-button" onclick="closeCollectionAuthModal()">Cancel</button>
                     <button class="send-button" onclick="saveCollectionAuthorization()">Save Authorization</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manage Environments Modal -->
+    <div id="manageEnvironmentsModal" class="modal" onclick="closeManageEnvironmentsModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">⚙️ Manage Environments</div>
+                <button class="close-btn" onclick="closeManageEnvironmentsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 20px;">
+                    <p style="font-size: 12px; opacity: 0.7; margin: 0;">Click on an environment to edit its variables.</p>
+                </div>
+
+                <div id="environments-list" style="display: flex; flex-direction: column; gap: 10px;">
+                    <!-- Environment items will be populated here -->
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button class="send-button" onclick="showAddEnvironmentModal(); closeManageEnvironmentsModal();" style="padding: 8px 16px;">
+                        + New Environment
+                    </button>
                 </div>
             </div>
         </div>
@@ -1748,6 +1773,9 @@ export class APITestPanel {
         }
 
         function renderEnvironments(environments) {
+            // Store for Manage Environments modal
+            allEnvironmentsData = environments;
+
             const select = document.getElementById('environment');
             select.innerHTML = '<option value="">No Environment</option>';
 
@@ -1776,15 +1804,15 @@ export class APITestPanel {
             container.innerHTML = collections.map(col => \`
                 <div class="collection-item">
                     <div class="collection-header">
-                        <span class="collection-icon" id="icon-\${col.id}" onclick="toggleCollection(event, '\${col.id}')">▶</span>
-                        <span onclick="openCollectionDetails('\${col.id}')" style="cursor: pointer; flex: 1; display: flex; align-items: center; gap: 8px;">
+                        <span class="collection-icon" id="icon-\${col.id}" style="cursor: pointer; user-select: none;">▶</span>
+                        <span style="cursor: pointer; flex: 1; display: flex; align-items: center; gap: 8px;">
                             <span>📁 \${col.name}</span>
                             <span style="opacity: 0.6; font-size: 11px; margin-left: auto;">(\${col.requestCount})</span>
                         </span>
                     </div>
                     <div class="collection-requests" id="requests-\${col.id}">
                         \${col.requests && col.requests.length > 0 ? col.requests.map(req => \`
-                            <div class="request-item" onclick="loadCollectionRequest('\${col.id}', '\${req.id}')">
+                            <div class="request-item" data-collection-id="\${col.id}" data-request-id="\${req.id}">
                                 <span class="request-method method-\${req.method}">\${req.method}</span>
                                 <span>\${req.name || req.url}</span>
                             </div>
@@ -1792,6 +1820,54 @@ export class APITestPanel {
                     </div>
                 </div>
             \`).join('');
+
+            // Add event listeners after rendering
+            collections.forEach(col => {
+                const icon = document.getElementById('icon-' + col.id);
+                const header = icon?.parentElement;
+
+                if (icon && header) {
+                    // Arrow click - toggle expand/collapse
+                    icon.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        toggleCollectionExpand(col.id);
+                    });
+
+                    // Collection name click - open details
+                    const nameSpan = header.querySelector('span:nth-child(2)');
+                    if (nameSpan) {
+                        nameSpan.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            openCollectionDetails(col.id);
+                        });
+                    }
+                }
+
+                // Request item clicks
+                col.requests?.forEach(req => {
+                    const requestItem = document.querySelector(\`[data-collection-id="\${col.id}"][data-request-id="\${req.id}"]\`);
+                    if (requestItem) {
+                        requestItem.addEventListener('click', () => {
+                            loadCollectionRequestToTab(col.id, req.id);
+                        });
+                    }
+                });
+            });
+        }
+
+        function toggleCollectionExpand(collectionId) {
+            const requestsDiv = document.getElementById('requests-' + collectionId);
+            const icon = document.getElementById('icon-' + collectionId);
+
+            if (requestsDiv && icon) {
+                if (requestsDiv.classList.contains('show')) {
+                    requestsDiv.classList.remove('show');
+                    icon.classList.remove('expanded');
+                } else {
+                    requestsDiv.classList.add('show');
+                    icon.classList.add('expanded');
+                }
+            }
         }
 
         function renderCollectionSelector(collections) {
@@ -1806,19 +1882,9 @@ export class APITestPanel {
             });
         }
 
-        function toggleCollection(event, collectionId) {
-            event.stopPropagation();
-            const requestsDiv = document.getElementById('requests-' + collectionId);
-            const icon = document.getElementById('icon-' + collectionId);
-
-            if (requestsDiv.classList.contains('show')) {
-                requestsDiv.classList.remove('show');
-                icon.classList.remove('expanded');
-            } else {
-                requestsDiv.classList.add('show');
-                icon.classList.add('expanded');
-            }
-        }
+        // Store original request builder HTML to restore later
+        let originalRequestBuilderHTML = '';
+        let isShowingCollectionDetails = false;
 
         function openCollectionDetails(collectionId) {
             const collection = collectionsData.find(c => c.id === collectionId);
@@ -1830,7 +1896,7 @@ export class APITestPanel {
             // Get existing authorization
             const existingAuth = collectionAuthorizations[collectionId] || { type: 'none' };
 
-            // Hide response panel and show collection details in request builder
+            // Save original HTML and show collection details
             const requestBuilder = document.querySelector('.request-builder');
             const responsePanel = document.querySelector('.response-panel');
 
@@ -1839,9 +1905,15 @@ export class APITestPanel {
                 return;
             }
 
-            // Hide response panel temporarily
+            // Save original HTML if not already saved
+            if (!isShowingCollectionDetails) {
+                originalRequestBuilderHTML = requestBuilder.innerHTML;
+                isShowingCollectionDetails = true;
+            }
+
+            // Show response panel (it will hold our collection details)
             if (responsePanel) {
-                responsePanel.style.display = 'none';
+                responsePanel.style.display = 'flex';
             }
 
             requestBuilder.innerHTML = \`
@@ -2026,13 +2098,32 @@ export class APITestPanel {
                 authorization: authorization
             });
 
-            // Show success and reload to refresh view
+            // Show success and close
             alert('Collection settings saved!');
-            location.reload();
+            closeCollectionDetails();
         }
 
         function closeCollectionDetails() {
-            location.reload();
+            const requestBuilder = document.querySelector('.request-builder');
+            const responsePanel = document.querySelector('.response-panel');
+
+            if (requestBuilder && originalRequestBuilderHTML) {
+                requestBuilder.innerHTML = originalRequestBuilderHTML;
+                isShowingCollectionDetails = false;
+
+                // Restore response panel
+                if (responsePanel) {
+                    responsePanel.style.display = 'flex';
+                }
+
+                // Re-initialize event listeners for the restored content
+                initializeRequestBuilderEvents();
+            }
+        }
+
+        function initializeRequestBuilderEvents() {
+            // Re-attach any needed event listeners to the restored request builder
+            // The main event listeners are inline in the HTML, so they should work automatically
         }
 
         function loadCollectionRequest(collectionId, requestId) {
@@ -2373,6 +2464,64 @@ export class APITestPanel {
             });
 
             closeEditEnvironmentModal();
+        }
+
+        // Manage Environments Modal Functions
+        let allEnvironmentsData = [];
+
+        function showManageEnvironmentsModal() {
+            const modal = document.getElementById('manageEnvironmentsModal');
+            const listContainer = document.getElementById('environments-list');
+
+            // Request fresh environment data
+            vscode.postMessage({ command: 'loadEnvironments' });
+
+            // Populate the list
+            if (!allEnvironmentsData || allEnvironmentsData.length === 0) {
+                listContainer.innerHTML = '<div class="empty-state">No environments yet. Create one to get started!</div>';
+            } else {
+                listContainer.innerHTML = allEnvironmentsData.map(env => \`
+                    <div style="border: 1px solid var(--vscode-panel-border); border-radius: 4px; padding: 12px; cursor: pointer; transition: background-color 0.2s;"
+                         onmouseover="this.style.backgroundColor='var(--vscode-list-hoverBackground)'"
+                         onmouseout="this.style.backgroundColor='transparent'"
+                         onclick="editEnvironmentFromManage('\${env.id}', '\${env.name}')">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong>\${env.name}</strong>
+                                \${env.isActive ? '<span style="color: var(--vscode-focusBorder); margin-left: 8px;">✓ Active</span>' : ''}
+                            </div>
+                            <button class="env-edit-btn" onclick="event.stopPropagation(); editEnvironmentFromManage('\${env.id}', '\${env.name}')" title="Edit">
+                                ✏️ Edit
+                            </button>
+                        </div>
+                    </div>
+                \`).join('');
+            }
+
+            modal.classList.add('show');
+        }
+
+        function closeManageEnvironmentsModal(event) {
+            if (!event || event.target.id === 'manageEnvironmentsModal') {
+                document.getElementById('manageEnvironmentsModal').classList.remove('show');
+            }
+        }
+
+        function editEnvironmentFromManage(environmentId, environmentName) {
+            // Close manage modal
+            closeManageEnvironmentsModal();
+
+            // Open edit modal
+            currentEnvironmentId = environmentId;
+            document.getElementById('edit-env-name').textContent = environmentName;
+
+            // Request environment details from backend
+            vscode.postMessage({
+                command: 'getEnvironmentVariables',
+                environmentId: environmentId
+            });
+
+            document.getElementById('editEnvironmentModal').classList.add('show');
         }
 
         // Collection Authorization Modal Functions
