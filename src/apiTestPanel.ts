@@ -19,6 +19,20 @@ export class APITestPanel {
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
         this._panel.webview.html = this._getHtmlContent();
 
+        // Listen to collection changes to auto-refresh
+        this._disposables.push(
+            this.collectionsManager.onDidChangeCollections(() => {
+                this.sendCollections();
+            })
+        );
+
+        // Listen to environment changes to auto-refresh
+        this._disposables.push(
+            this.environmentManager.onDidChangeEnvironments(() => {
+                this.sendEnvironments();
+            })
+        );
+
         this._panel.webview.onDidReceiveMessage(
             async (message) => {
                 switch (message.command) {
@@ -63,7 +77,11 @@ export class APITestPanel {
                         this.sendCollections(); // Refresh collections after save
                         break;
                     case 'createCollection':
-                        vscode.commands.executeCommand('toolbox.createCollection');
+                        await vscode.commands.executeCommand('toolbox.createCollection');
+                        // Collections will auto-refresh via event listener
+                        break;
+                    case 'createEnvironment':
+                        await this.handleCreateEnvironment(message.name, message.variables);
                         break;
                 }
             },
@@ -183,6 +201,25 @@ export class APITestPanel {
         }
     }
 
+    private async handleCreateEnvironment(name: string, variables: { key: string; value: string; isSecret: boolean }[]) {
+        try {
+            const env = await this.environmentManager.createEnvironment(name);
+
+            // Add variables to the environment
+            for (const variable of variables) {
+                if (variable.key && variable.value) {
+                    await this.environmentManager.setVariable(env.id, variable.key, variable.value, variable.isSecret);
+                }
+            }
+
+            vscode.window.showInformationMessage(`Environment "${name}" created successfully!`);
+            this.sendEnvironments(); // Refresh environments list
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            vscode.window.showErrorMessage(`Failed to create environment: ${errorMessage}`);
+        }
+    }
+
     public dispose() {
         APITestPanel.currentPanel = undefined;
         this._panel.dispose();
@@ -291,6 +328,22 @@ export class APITestPanel {
 
         .history-btn:hover {
             background-color: var(--vscode-button-secondaryHoverBackground);
+        }
+
+        .add-env-btn {
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+
+        .add-env-btn:hover {
+            background-color: var(--vscode-button-hoverBackground);
         }
 
         /* Main Container */
@@ -753,6 +806,7 @@ export class APITestPanel {
                 <select id="environment" onchange="changeEnvironment()">
                     <option value="">No Environment</option>
                 </select>
+                <button class="add-env-btn" onclick="showAddEnvironmentModal()" title="Add Environment">+ Add</button>
             </div>
             <button class="history-btn" onclick="showHistoryModal()">
                 📜 History
@@ -841,6 +895,41 @@ export class APITestPanel {
             </div>
             <div class="modal-body" id="history-list">
                 <div class="empty-state">No requests yet</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Environment Modal -->
+    <div id="addEnvironmentModal" class="modal" onclick="closeAddEnvironmentModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">🌍 Create Environment</div>
+                <button class="close-btn" onclick="closeAddEnvironmentModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Environment Name:</label>
+                    <input type="text" id="env-name" placeholder="e.g., Development, Production" style="width: 100%;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Variables:</label>
+                    <div id="env-variables-grid" style="display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 10px; margin-bottom: 10px;">
+                        <input type="text" class="env-var-key" placeholder="Variable name" value="API_KEY">
+                        <input type="text" class="env-var-value" placeholder="Variable value" value="">
+                        <label style="display: flex; align-items: center; gap: 5px; font-size: 12px;">
+                            <input type="checkbox" class="env-var-secret" checked>
+                            <span>Secret</span>
+                        </label>
+                        <button class="remove-btn" onclick="this.parentElement.querySelectorAll('input, label').forEach(el => el.remove()); this.remove();">×</button>
+                    </div>
+                    <button class="add-header-btn" onclick="addEnvironmentVariable()">+ Add Variable</button>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button class="save-button" onclick="closeAddEnvironmentModal()">Cancel</button>
+                    <button class="send-button" onclick="createEnvironment()">Create Environment</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1240,6 +1329,105 @@ export class APITestPanel {
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#039;');
+        }
+
+        // Environment Modal Functions
+        function showAddEnvironmentModal() {
+            document.getElementById('addEnvironmentModal').classList.add('show');
+        }
+
+        function closeAddEnvironmentModal(event) {
+            if (!event || event.target.id === 'addEnvironmentModal') {
+                document.getElementById('addEnvironmentModal').classList.remove('show');
+                // Reset form
+                document.getElementById('env-name').value = '';
+                document.getElementById('env-variables-grid').innerHTML = \`
+                    <input type="text" class="env-var-key" placeholder="Variable name" value="API_KEY">
+                    <input type="text" class="env-var-value" placeholder="Variable value" value="">
+                    <label style="display: flex; align-items: center; gap: 5px; font-size: 12px;">
+                        <input type="checkbox" class="env-var-secret" checked>
+                        <span>Secret</span>
+                    </label>
+                    <button class="remove-btn" onclick="this.parentElement.querySelectorAll('input, label').forEach(el => el.remove()); this.remove();">×</button>
+                \`;
+            }
+        }
+
+        function addEnvironmentVariable() {
+            const grid = document.getElementById('env-variables-grid');
+
+            const keyInput = document.createElement('input');
+            keyInput.type = 'text';
+            keyInput.className = 'env-var-key';
+            keyInput.placeholder = 'Variable name';
+
+            const valueInput = document.createElement('input');
+            valueInput.type = 'text';
+            valueInput.className = 'env-var-value';
+            valueInput.placeholder = 'Variable value';
+
+            const secretLabel = document.createElement('label');
+            secretLabel.style.display = 'flex';
+            secretLabel.style.alignItems = 'center';
+            secretLabel.style.gap = '5px';
+            secretLabel.style.fontSize = '12px';
+
+            const secretCheckbox = document.createElement('input');
+            secretCheckbox.type = 'checkbox';
+            secretCheckbox.className = 'env-var-secret';
+
+            const secretSpan = document.createElement('span');
+            secretSpan.textContent = 'Secret';
+
+            secretLabel.appendChild(secretCheckbox);
+            secretLabel.appendChild(secretSpan);
+
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'remove-btn';
+            removeBtn.textContent = '×';
+            removeBtn.onclick = function() {
+                keyInput.remove();
+                valueInput.remove();
+                secretLabel.remove();
+                removeBtn.remove();
+            };
+
+            grid.appendChild(keyInput);
+            grid.appendChild(valueInput);
+            grid.appendChild(secretLabel);
+            grid.appendChild(removeBtn);
+        }
+
+        function createEnvironment() {
+            const name = document.getElementById('env-name').value.trim();
+            if (!name) {
+                alert('Please enter an environment name');
+                return;
+            }
+
+            const grid = document.getElementById('env-variables-grid');
+            const keys = grid.querySelectorAll('.env-var-key');
+            const values = grid.querySelectorAll('.env-var-value');
+            const secrets = grid.querySelectorAll('.env-var-secret');
+
+            const variables = [];
+            for (let i = 0; i < keys.length; i++) {
+                const key = keys[i].value.trim();
+                const value = values[i].value.trim();
+                const isSecret = secrets[i].checked;
+
+                if (key && value) {
+                    variables.push({ key, value, isSecret });
+                }
+            }
+
+            vscode.postMessage({
+                command: 'createEnvironment',
+                name: name,
+                variables: variables
+            });
+
+            closeAddEnvironmentModal();
         }
 
         // Load initial data
