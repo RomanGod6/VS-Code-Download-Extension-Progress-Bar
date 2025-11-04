@@ -1822,13 +1822,28 @@ export class APITestPanel {
 
         function openCollectionDetails(collectionId) {
             const collection = collectionsData.find(c => c.id === collectionId);
-            if (!collection) return;
+            if (!collection) {
+                console.error('Collection not found:', collectionId);
+                return;
+            }
 
             // Get existing authorization
             const existingAuth = collectionAuthorizations[collectionId] || { type: 'none' };
 
-            // Hide request builder, show collection details
+            // Hide response panel and show collection details in request builder
             const requestBuilder = document.querySelector('.request-builder');
+            const responsePanel = document.querySelector('.response-panel');
+
+            if (!requestBuilder) {
+                console.error('Request builder not found');
+                return;
+            }
+
+            // Hide response panel temporarily
+            if (responsePanel) {
+                responsePanel.style.display = 'none';
+            }
+
             requestBuilder.innerHTML = \`
                 <div style="padding: 20px;">
                     <h2 style="margin: 0 0 20px 0; font-size: 20px; display: flex; align-items: center; gap: 10px;">
@@ -1867,6 +1882,9 @@ export class APITestPanel {
                     <div style="display: flex; gap: 10px; margin-top: 30px;">
                         <button class="send-button" onclick="saveCollectionDetails('\${collectionId}')" style="padding: 10px 20px;">
                             💾 Save Changes
+                        </button>
+                        <button class="save-button" onclick="closeCollectionDetails()" style="padding: 10px 20px;">
+                            ← Back to Requests
                         </button>
                     </div>
                 </div>
@@ -2008,9 +2026,13 @@ export class APITestPanel {
                 authorization: authorization
             });
 
-            // TODO: Also update collection name if changed
-            // For now, just show success message
+            // Show success and reload to refresh view
             alert('Collection settings saved!');
+            location.reload();
+        }
+
+        function closeCollectionDetails() {
+            location.reload();
         }
 
         function loadCollectionRequest(collectionId, requestId) {
@@ -2018,18 +2040,6 @@ export class APITestPanel {
                 command: 'loadCollectionRequest',
                 collectionId: collectionId,
                 requestId: requestId
-            });
-        }
-
-        function changeEnvironment() {
-            const select = document.getElementById('environment');
-            const environmentId = select.value;
-            const environmentName = select.options[select.selectedIndex].text.replace(' ✓', '');
-
-            vscode.postMessage({
-                command: 'setActiveEnvironment',
-                environmentId: environmentId,
-                environmentName: environmentName
             });
         }
 
