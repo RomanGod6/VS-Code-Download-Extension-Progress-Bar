@@ -1,43 +1,142 @@
 {
-  "name": "download-progress-tracker",
-  "displayName": "Download Progress Tracker",
-  "description": "Beautiful download progress tracking with modern UI",
-  "version": "1.0.0",
+  "name": "developer-toolbox",
+  "displayName": "Developer Toolbox - Ultimate Utilities Suite",
+  "description": "All-in-one developer utilities: Downloads, File tools, Text converters, Clipboard manager, Image tools, and more!",
+  "version": "2.0.0",
+  "publisher": "developer-toolbox",
+  "icon": "resources/toolbox-icon.png",
+  "keywords": [
+    "download",
+    "utilities",
+    "tools",
+    "file",
+    "converter",
+    "clipboard",
+    "hash",
+    "compress",
+    "extract"
+  ],
   "engines": {
     "vscode": "^1.75.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "Formatters",
+    "Linters"
   ],
   "activationEvents": [
-    "onCommand:downloadProgress.startDownload",
-    "onCommand:downloadProgress.showProgress",
-    "onFileSystem:*"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
+        "command": "toolbox.showPanel",
+        "title": "Toolbox: Open Toolbox Panel",
+        "icon": "$(tools)"
+      },
+      {
         "command": "downloadProgress.startDownload",
-        "title": "Download Progress: Start Download"
+        "title": "Toolbox: Download from URL",
+        "icon": "$(cloud-download)"
       },
       {
         "command": "downloadProgress.showProgress",
-        "title": "Download Progress: Show Downloads"
+        "title": "Toolbox: Show Downloads"
       },
       {
         "command": "downloadProgress.testDownload",
-        "title": "Download Progress: Test Download (Demo)"
+        "title": "Toolbox: Test Download (Demo)"
       },
       {
         "command": "downloadProgress.downloadFile",
-        "title": "Download with Progress Tracker",
+        "title": "Download with Toolbox",
         "icon": "$(cloud-download)"
       },
       {
         "command": "downloadProgress.downloadFileToWorkspace",
-        "title": "Download to Workspace with Progress",
+        "title": "Download to Workspace",
         "icon": "$(desktop-download)"
+      },
+      {
+        "command": "downloadProgress.batchDownload",
+        "title": "Toolbox: Batch Download URLs"
+      },
+      {
+        "command": "toolbox.hashFile",
+        "title": "Toolbox: Generate File Hash (MD5/SHA-256)"
+      },
+      {
+        "command": "toolbox.hashText",
+        "title": "Toolbox: Generate Text Hash"
+      },
+      {
+        "command": "toolbox.encodeBase64",
+        "title": "Toolbox: Encode Base64"
+      },
+      {
+        "command": "toolbox.decodeBase64",
+        "title": "Toolbox: Decode Base64"
+      },
+      {
+        "command": "toolbox.encodeURL",
+        "title": "Toolbox: Encode URL"
+      },
+      {
+        "command": "toolbox.decodeURL",
+        "title": "Toolbox: Decode URL"
+      },
+      {
+        "command": "toolbox.formatJSON",
+        "title": "Toolbox: Format JSON"
+      },
+      {
+        "command": "toolbox.minifyJSON",
+        "title": "Toolbox: Minify JSON"
+      },
+      {
+        "command": "toolbox.jsonToCSV",
+        "title": "Toolbox: Convert JSON to CSV"
+      },
+      {
+        "command": "toolbox.csvToJSON",
+        "title": "Toolbox: Convert CSV to JSON"
+      },
+      {
+        "command": "toolbox.generateUUID",
+        "title": "Toolbox: Generate UUID"
+      },
+      {
+        "command": "toolbox.timestampToDate",
+        "title": "Toolbox: Convert Timestamp to Date"
+      },
+      {
+        "command": "toolbox.dateToTimestamp",
+        "title": "Toolbox: Convert Date to Timestamp"
+      },
+      {
+        "command": "toolbox.caseConverter",
+        "title": "Toolbox: Convert Text Case"
+      },
+      {
+        "command": "toolbox.loremIpsum",
+        "title": "Toolbox: Generate Lorem Ipsum"
+      },
+      {
+        "command": "toolbox.extractArchive",
+        "title": "Toolbox: Extract Archive"
+      },
+      {
+        "command": "toolbox.createArchive",
+        "title": "Toolbox: Create Archive (Zip)"
+      },
+      {
+        "command": "toolbox.clipboardHistory",
+        "title": "Toolbox: Show Clipboard History"
+      },
+      {
+        "command": "toolbox.detectURLsInFile",
+        "title": "Toolbox: Detect URLs in Current File"
       }
     ],
     "menus": {
@@ -64,19 +163,57 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "download-progress",
-          "title": "Downloads",
-          "icon": "resources/download.svg"
+          "id": "developer-toolbox",
+          "title": "Developer Toolbox",
+          "icon": "resources/toolbox.svg"
         }
       ]
     },
     "views": {
-      "download-progress": [
+      "developer-toolbox": [
+        {
+          "id": "toolboxQuickActions",
+          "name": "Quick Actions"
+        },
         {
           "id": "downloadProgressView",
-          "name": "Active Downloads"
+          "name": "Downloads"
+        },
+        {
+          "id": "toolboxClipboardHistory",
+          "name": "Clipboard History"
         }
       ]
+    },
+    "configuration": {
+      "title": "Developer Toolbox",
+      "properties": {
+        "toolbox.downloads.autoExtractArchives": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically extract archives after downloading"
+        },
+        "toolbox.downloads.maxConcurrent": {
+          "type": "number",
+          "default": 3,
+          "description": "Maximum number of concurrent downloads"
+        },
+        "toolbox.clipboard.historySize": {
+          "type": "number",
+          "default": 50,
+          "description": "Number of clipboard items to remember"
+        },
+        "toolbox.clipboard.detectURLs": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show notification when URL is copied to clipboard"
+        },
+        "toolbox.urlDetection.enableCodeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show download button above URLs in code"
+        }
+      }
     }
   },
   "scripts": {
@@ -91,13 +228,18 @@
     "dev": "npm run compile && code --extensionDevelopmentPath=$(pwd)"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
     "@types/node": "^18.0.0",
+    "@types/uuid": "^10.0.0",
     "@types/vscode": "^1.75.0",
     "@vscode/test-electron": "^2.3.0",
-    "typescript": "^5.0.0",
-    "@vscode/vsce": "^2.19.0"
+    "@vscode/vsce": "^2.19.0",
+    "typescript": "^5.0.0"
   },
   "dependencies": {
-    "axios": "^1.6.0"
+    "adm-zip": "^0.5.10",
+    "axios": "^1.6.0",
+    "clipboardy": "^3.0.0",
+    "uuid": "^9.0.0"
   }
 }

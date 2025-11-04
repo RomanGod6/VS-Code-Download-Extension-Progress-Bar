@@ -1,275 +1,327 @@
-# Download Progress Tracker
+# 🧰 Developer Toolbox - Ultimate VS Code Utilities Suite
 
-A beautiful and functional VS Code extension for tracking download progress with a modern UI.
+**The Swiss Army knife for developers!** All-in-one utility extension with 30+ tools for downloads, text processing, file operations, API testing, and more - all natively integrated into VS Code.
 
-## Features
+## ✨ What's Included
 
-- **Real-time Progress Tracking**: Monitor download progress with live updates
-- **Beautiful UI**: Modern, responsive interface with smooth animations
-- **Sidebar Integration**: Dedicated view in the Activity Bar for quick access
-- **Detailed Progress Panel**: Full-featured webview with comprehensive download statistics
-- **Speed & Time Estimates**: Real-time download speed and time remaining calculations
-- **Multiple Downloads**: Handle multiple simultaneous downloads
-- **Easy File Access**: Quick actions to open downloaded files or reveal in explorer
-- **Test Mode**: Built-in test downloads to try the extension
-- **🆕 Right-Click Downloads**: Download any file from explorer with progress tracking
-- **🆕 SSH/Remote Support**: Automatically track downloads from SSH and remote connections
-- **🆕 Context Menu Integration**: "Download with Progress Tracker" in file context menus
+### 📥 Download Manager
+- **Download from URL** with real-time progress tracking
+- **Batch downloads** - paste multiple URLs at once
+- **Right-click downloads** from Explorer (files, SSH, remote)
+- **Clipboard URL detection** - auto-prompt when you copy a URL
+- **Resume & retry** failed downloads
+- Beautiful progress UI with speed & time estimates
 
-## Screenshots
+### 🌐 API Tester (Like Postman!)
+- **Send HTTP requests** (GET, POST, PUT, DELETE, PATCH)
+- **Auto-detect APIs** in your code (fetch, axios calls)
+- **Request history** - replay previous requests
+- **Beautiful response viewer** with JSON formatting
+- Custom headers & request bodies
+- No need to leave VS Code!
 
-### Sidebar View
-The extension adds a download icon to the Activity Bar. Click it to see all active downloads with:
-- Real-time progress percentages
-- Download speeds
-- File sizes
-- Status indicators
+### 📋 Clipboard Manager
+- **Automatic history** of everything you copy (last 50 items)
+- **Smart detection** - identifies URLs, code, and text
+- **Pin important items** to keep them forever
+- **Search history** and quickly re-copy
+- **URL notifications** - get notified when you copy a URL
 
-### Progress Panel
-Open the detailed progress panel to see:
-- Beautiful progress bars with animations
-- Download statistics (size, speed, time remaining)
-- Action buttons (cancel, open file, etc.)
-- Professional gradient design
+### 🔤 Text Utilities
+- **Hash generation** - MD5, SHA-1, SHA-256, SHA-512
+- **Base64 encode/decode**
+- **URL encode/decode**
+- **JSON format/minify**
+- **JSON ↔ CSV conversion**
+- **Case converter** - camelCase, snake_case, kebab-case, etc.
+- **Lorem Ipsum generator**
 
-## Installation
+### 📁 File Utilities
+- **File hashing** - generate checksums for any file
+- **Extract archives** - unzip .zip files with one click
+- **Create archives** - compress files/folders to .zip
+- **File size calculator**
 
-### For Development
+### ⚡ Quick Actions
+- **Generate UUID** - instant unique IDs
+- **Timestamp converter** - Unix timestamp ↔ Date
+- **Current timestamp** - get now, yesterday, tomorrow
+- And more utilities at your fingertips!
 
-1. **Clone and install dependencies:**
-   ```bash
-   git clone <repository-url>
-   cd VS-Code-Download-Extension-Progress-Bar
-   npm install
-   ```
+## 🚀 Getting Started
 
-2. **Compile the extension:**
-   ```bash
-   npm run compile
-   ```
-
-3. **Test in VS Code:**
-   - Press `F5` to open Extension Development Host
-   - Or run: `./scripts/dev.sh`
-
-### For Production Use
-
-1. **Package the extension:**
-   ```bash
-   ./scripts/package.sh
-   ```
-
-2. **Install the .vsix file:**
-   ```bash
-   code --install-extension *.vsix
-   ```
-   Or use: `./scripts/install.sh` to do both steps automatically
-
-## Usage
-
-### Right-Click Downloads (NEW!)
-
-**Download any file with progress tracking:**
-
-1. **In Explorer**: Right-click on any file → `Download with Progress Tracker`
-2. **SSH/Remote Files**: Right-click → `Download to Workspace with Progress`
-3. **Editor Tab**: Right-click on editor tab → `Download with Progress Tracker`
-
-The extension automatically detects:
-- Remote files (SSH, Remote-SSH, Codespaces)
-- Local files (offers to copy to downloads folder)
-- File size and shows real-time progress
-
-### Starting a Download from URL
-
-1. Open Command Palette (`Cmd/Ctrl+Shift+P`)
-2. Type: `Download Progress: Start Download`
-3. Enter the URL to download
-4. (Optional) Specify a custom filename
-
-### Test Download
-
-Try the extension with test files:
-
-1. Open Command Palette
-2. Type: `Download Progress: Test Download (Demo)`
-3. Choose from test files of various sizes
-
-### Viewing Progress
-
-**Sidebar View:**
-- Click the download icon (📥) in the Activity Bar
-- See all downloads in the tree view
-
-**Progress Panel:**
-- Command: `Download Progress: Show Downloads`
-- Or click a download in the sidebar
-- View detailed statistics and controls
-
-### Managing Downloads
-
-**Cancel a Download:**
-- Right-click on a downloading item in the sidebar
-- Or use the Cancel button in the progress panel
-
-**Clear Completed:**
-- Command: `Download Progress: Clear Completed`
-- Or use the button in the progress panel
-
-**Open Downloaded Files:**
-- Click on completed downloads in the sidebar
-- Or use the context menu options
-
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `Download Progress: Start Download` | Start a new download from URL |
-| `Download Progress: Show Downloads` | Open the progress panel |
-| `Download Progress: Test Download (Demo)` | Try test downloads |
-| `Download with Progress Tracker` | Download selected file (context menu) |
-| `Download to Workspace with Progress` | Download remote file to workspace |
-| `Download Progress: Clear Completed` | Remove completed downloads from list |
-
-### Context Menu Commands
-
-Right-click on any file in the Explorer to see:
-- **Download with Progress Tracker** - Available for all files
-- **Download to Workspace with Progress** - Available for SSH/remote files
-
-## Development Scripts
+### Installation
 
 ```bash
-# Development mode with watch
-npm run watch
-./scripts/dev.sh
-
-# Compile TypeScript
+# Clone and install
+git clone <repository-url>
+cd VS-Code-Download-Extension-Progress-Bar
+npm install
 npm run compile
 
-# Test the extension
-./scripts/test.sh
+# Test in development
+# Press F5 in VS Code
 
-# Package for distribution
-npm run package
-./scripts/package.sh
-
-# Package and install locally
+# Or install as extension
 ./scripts/install.sh
 ```
 
-## Project Structure
+### Quick Start
 
+1. **Open the Toolbox** - Click the toolbox icon (🧰) in the Activity Bar
+2. **Try Quick Actions** - See all available utilities in the sidebar
+3. **Test a download** - Command Palette → "Toolbox: Test Download"
+4. **Send an API request** - Command Palette → "Toolbox: Test API"
+
+## 💡 Usage Examples
+
+### Download Files
+
+**From URL:**
 ```
-.
-├── src/
-│   ├── extension.ts              # Main entry point
-│   ├── downloadManager.ts        # Download logic and state management
-│   ├── downloadTreeProvider.ts   # Sidebar tree view provider
-│   ├── progressPanel.ts          # Webview panel with detailed UI
-│   └── fileTransferMonitor.ts    # File transfer and remote download handler
-├── resources/
-│   └── download.svg              # Extension icon
-├── scripts/
-│   ├── dev.sh                    # Development script
-│   ├── test.sh                   # Testing script
-│   ├── package.sh                # Packaging script
-│   └── install.sh                # Install script
-├── package.json                  # Extension manifest
-└── tsconfig.json                 # TypeScript configuration
+Cmd/Ctrl+Shift+P → "Toolbox: Download from URL"
+Enter: https://example.com/file.zip
 ```
 
-## Technical Details
+**Batch Download:**
+```
+Cmd/Ctrl+Shift+P → "Toolbox: Batch Download URLs"
+Paste multiple URLs (one per line or comma-separated)
+```
+
+**Right-click in Explorer:**
+```
+Right-click any file → "Download with Toolbox"
+Works with SSH, remote files, and local files!
+```
+
+### Test APIs
+
+**Quick API Test:**
+```
+Cmd/Ctrl+Shift+P → "Toolbox: Test API"
+Select method (GET, POST, etc.)
+Enter URL
+Add headers/body if needed
+Send!
+```
+
+**Auto-detect APIs in Code:**
+```
+Open a file with fetch() or axios calls
+Cmd/Ctrl+Shift+P → "Toolbox: Detect APIs in File"
+Select an API to test
+```
+
+### Text Utilities
+
+**Hash Text:**
+```
+Select text in editor
+Cmd/Ctrl+Shift+P → "Toolbox: Generate Text Hash"
+Choose algorithm (MD5, SHA-256, etc.)
+Hash copied to clipboard!
+```
+
+**Convert JSON to CSV:**
+```
+Select JSON array in editor
+Cmd/Ctrl+Shift+P → "Toolbox: Convert JSON to CSV"
+CSV opens in new file
+```
+
+**Change Text Case:**
+```
+Select text
+Cmd/Ctrl+Shift+P → "Toolbox: Convert Text Case"
+Choose: camelCase, snake_case, kebab-case, etc.
+```
+
+### File Operations
+
+**Hash a File:**
+```
+Cmd/Ctrl+Shift+P → "Toolbox: Generate File Hash"
+Select file
+Choose algorithm
+Hash copied to clipboard!
+```
+
+**Extract Archive:**
+```
+Cmd/Ctrl+Shift+P → "Toolbox: Extract Archive"
+Select .zip file
+Files extracted to folder!
+```
+
+## 📚 All Commands
+
+| Command | Description |
+|---------|-------------|
+| **Downloads** |
+| `Toolbox: Download from URL` | Download file from URL |
+| `Toolbox: Batch Download URLs` | Download multiple URLs at once |
+| `Toolbox: Show Downloads` | View active downloads panel |
+| `Toolbox: Test Download` | Try demo downloads |
+| **API Testing** |
+| `Toolbox: Test API` | Send HTTP request |
+| `Toolbox: Detect APIs in File` | Find API calls in current file |
+| **Text Utilities** |
+| `Toolbox: Generate Text Hash` | Hash text (MD5, SHA-256, etc.) |
+| `Toolbox: Encode Base64` | Encode text to Base64 |
+| `Toolbox: Decode Base64` | Decode Base64 to text |
+| `Toolbox: Encode URL` | URL-encode text |
+| `Toolbox: Decode URL` | URL-decode text |
+| `Toolbox: Format JSON` | Pretty-print JSON |
+| `Toolbox: Minify JSON` | Compress JSON |
+| `Toolbox: Convert JSON to CSV` | Convert JSON array to CSV |
+| `Toolbox: Convert CSV to JSON` | Convert CSV to JSON |
+| `Toolbox: Convert Text Case` | Change casing style |
+| `Toolbox: Generate Lorem Ipsum` | Create placeholder text |
+| **File Utilities** |
+| `Toolbox: Generate File Hash` | Get file checksum |
+| `Toolbox: Extract Archive` | Unzip files |
+| `Toolbox: Create Archive` | Create ZIP file |
+| **Quick Actions** |
+| `Toolbox: Generate UUID` | Create unique ID |
+| `Toolbox: Convert Timestamp to Date` | Unix timestamp → Date |
+| `Toolbox: Convert Date to Timestamp` | Date → Unix timestamp |
+| **Clipboard** |
+| `Toolbox: Show Clipboard History` | View clipboard history |
+
+## ⚙️ Configuration
+
+```json
+{
+  "toolbox.downloads.autoExtractArchives": false,
+  "toolbox.downloads.maxConcurrent": 3,
+  "toolbox.clipboard.historySize": 50,
+  "toolbox.clipboard.detectURLs": true,
+  "toolbox.urlDetection.enableCodeLens": true
+}
+```
+
+## 🎯 Features in Detail
+
+### Smart Clipboard Manager
+- Monitors clipboard automatically
+- Detects URLs and shows download prompt
+- Keeps history of last 50 items
+- Pin important items to keep forever
+- Search and filter history
+- Re-copy previous items instantly
+
+### API Tester
+- Send any HTTP request without leaving VS Code
+- Auto-detect API calls in your code
+- Beautiful response viewer with JSON formatting
+- Save request history
+- Custom headers and authentication
+- Perfect for testing backends during development
 
 ### Download Manager
-- Uses Node.js `https`/`http` modules for URL downloads
-- Tracks progress, speed, and time estimates
-- Handles redirects automatically
-- Emits events for UI updates
+- Real-time progress with speed tracking
+- Multiple simultaneous downloads
+- Works with SSH and remote files
+- Right-click download from Explorer
+- Auto-extract archives (optional)
+- Clipboard URL detection
 
-### File Transfer Monitor (NEW)
-- Monitors file system operations for download detection
-- Handles SSH/remote file transfers with VS Code's FileSystem API
-- Chunked reading/writing for large files with progress updates
-- Automatic scheme detection (file, ssh, vscode-remote, etc.)
+### Text & Data Converters
+- Hash any text or file
+- Encode/decode Base64, URL
+- Format and minify JSON
+- Convert between JSON, CSV, and more
+- Case conversion for variable names
+- Lorem Ipsum generator
 
-### UI Components
-1. **Tree View Provider**: Sidebar integration with VS Code's tree view API
-2. **Webview Panel**: Custom HTML/CSS/JavaScript interface with:
-   - Gradient progress bars
-   - Animated loading states
-   - Responsive grid layout
-   - Real-time statistics
-3. **Context Menus**: Integrated into Explorer and Editor contexts
+## 🏗️ Architecture
 
-### Features
-- TypeScript for type safety
-- Event-driven architecture
-- Automatic file naming
-- Workspace-aware save locations (saves to `downloads/` folder in workspace)
-- Remote file system support (SSH, Remote-SSH, Codespaces)
-- Proper cleanup and disposal
+```
+├── src/
+│   ├── extension.ts              # Main entry point
+│   ├── downloadManager.ts        # Download handling
+│   ├── fileTransferMonitor.ts    # SSH/remote file transfers
+│   ├── clipboardManager.ts       # Clipboard monitoring & history
+│   ├── clipboardTreeProvider.ts  # Clipboard history UI
+│   ├── apiTester.ts              # API testing (Postman-like)
+│   ├── textUtilities.ts          # Text processing utilities
+│   ├── fileUtilities.ts          # File operations
+│   ├── quickActions.ts           # Quick action providers
+│   ├── downloadTreeProvider.ts   # Download sidebar UI
+│   └── progressPanel.ts          # Download progress webview
+├── resources/
+│   └── toolbox.svg               # Extension icon
+└── package.json                  # Extension manifest
+```
 
-## Requirements
+## 🤝 Contributing
 
-- VS Code 1.75.0 or higher
-- Node.js 18.x or higher
+Contributions are welcome! Feel free to:
+- Add new utilities
+- Improve existing features
+- Fix bugs
+- Enhance documentation
 
-## Configuration
+## 📝 Changelog
 
-Downloads are saved to:
-- `<workspace>/downloads/` if a workspace is open
-- User's home directory otherwise
+### 2.0.0 - The Ultimate Toolbox Update
+- 🎉 **Complete transformation** from download manager to full utility suite
+- 🌐 **NEW: API Tester** - Postman-like HTTP request testing
+- 📋 **NEW: Clipboard Manager** - automatic history with smart detection
+- 🔤 **NEW: Text Utilities** - hashing, encoding, case conversion, and more
+- 📁 **NEW: File Utilities** - archive extraction/creation, file hashing
+- ⚡ **NEW: Quick Actions** - UUID generator, timestamp converter
+- 📊 **NEW: Data Converters** - JSON/CSV conversion
+- 🎨 **NEW: Beautiful sidebar** with categorized utilities
+- 🔧 **Enhanced downloads** - batch downloads, clipboard URL detection
+- 🚀 **30+ utilities** in one extension!
 
-## Known Limitations
+### 1.0.0
+- Initial release with download progress tracking
+- Right-click download support
+- SSH/remote file integration
 
-- No pause/resume functionality (yet)
-- No bandwidth limiting
-- No authentication support
-- Downloads one chunk at a time (single connection)
+## 🎓 Use Cases
 
-## Future Enhancements
+**For Web Developers:**
+- Test your APIs without leaving VS Code
+- Download dependencies and assets
+- Convert data formats (JSON/CSV)
+- Hash passwords and generate UUIDs
 
-- [ ] Pause and resume downloads
-- [ ] Download queue management
-- [ ] Bandwidth limiting
-- [ ] Authentication support (username/password, tokens)
-- [ ] Multi-connection downloads for speed
-- [ ] Download history
-- [ ] Retry failed downloads
-- [ ] Browser integration
-- [ ] Scheduled downloads
+**For Backend Developers:**
+- Test REST APIs during development
+- Hash files and generate checksums
+- Extract and create archives
+- Convert timestamps
 
-## Contributing
+**For Data Scientists:**
+- Download datasets with progress tracking
+- Convert between JSON and CSV
+- Generate sample data (Lorem Ipsum)
+- Batch download multiple files
 
-Contributions are welcome! Please feel free to submit issues or pull requests.
+**For DevOps:**
+- Download files from remote servers
+- Hash files for verification
+- Test API endpoints
+- Archive and extract files
 
-## License
+## 📄 License
 
-MIT License - feel free to use this extension however you'd like!
+MIT License - use it however you'd like!
 
-## Support
+## 🌟 Why Developer Toolbox?
 
-If you encounter any issues or have questions:
-1. Check the Output panel: `Download Progress` channel
-2. Open an issue on GitHub
-3. Review the console logs in Extension Development Host
-
-## Changelog
-
-### 1.0.0 (Initial Release)
-- Real-time download progress tracking
-- Beautiful modern UI
-- Sidebar integration
-- Progress panel with detailed statistics
-- Test download functionality
-- File management (open, reveal in explorer)
-- Download speed and time estimates
-- Right-click context menu for downloads
-- SSH and remote file support
-- Automatic download detection for remote connections
-- File transfer monitoring
+- **All-in-one** - 30+ utilities in one extension
+- **Native** - Built specifically for VS Code
+- **Fast** - No need to switch to browser or external tools
+- **Beautiful** - Modern UI with smooth animations
+- **Free** - Completely open source
 
 ---
 
-Made with ❤️ for the VS Code community
+**Made with ❤️ for developers who love productivity!**
+
+*Save time. Code more. Use Developer Toolbox.* 🚀
