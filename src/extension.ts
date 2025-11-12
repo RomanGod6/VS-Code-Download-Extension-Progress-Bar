@@ -12,6 +12,8 @@ import { APITester } from './apiTester';
 import { APITestPanel } from './apiTestPanel';
 import { EnvironmentManager } from './environmentManager';
 import { CollectionsManager } from './collectionsManager';
+import { SQLiteManager } from './sqliteManager';
+import { SQLitePanel } from './sqlitePanel';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Developer Toolbox extension is now active!');
@@ -28,6 +30,7 @@ export function activate(context: vscode.ExtensionContext) {
     const environmentManager = new EnvironmentManager(context, context.secrets);
     const collectionsManager = new CollectionsManager(context);
     const apiTester = new APITester(outputChannel, context, environmentManager);
+    const sqliteManager = new SQLiteManager(context);
 
     // Initialize tree providers
     const downloadTreeProvider = new DownloadTreeProvider(downloadManager);
@@ -496,6 +499,35 @@ export function activate(context: vscode.ExtensionContext) {
         }
     );
 
+    // ===== SQLITE COMMANDS =====
+
+    const openSQLiteCommand = vscode.commands.registerCommand(
+        'toolbox.openSQLite',
+        () => {
+            SQLitePanel.createOrShow(sqliteManager, outputChannel);
+        }
+    );
+
+    const openSQLiteDatabaseCommand = vscode.commands.registerCommand(
+        'toolbox.openSQLiteDatabase',
+        async () => {
+            const success = await sqliteManager.openDatabase();
+            if (success) {
+                SQLitePanel.createOrShow(sqliteManager, outputChannel);
+            }
+        }
+    );
+
+    const createSQLiteDatabaseCommand = vscode.commands.registerCommand(
+        'toolbox.createSQLiteDatabase',
+        async () => {
+            const success = await sqliteManager.createDatabase();
+            if (success) {
+                SQLitePanel.createOrShow(sqliteManager, outputChannel);
+            }
+        }
+    );
+
     // ===== MAIN TOOLBOX PANEL =====
 
     const showPanelCommand = vscode.commands.registerCommand(
@@ -558,10 +590,14 @@ export function activate(context: vscode.ExtensionContext) {
         createCollectionCommand,
         importCollectionCommand,
         exportCollectionCommand,
+        openSQLiteCommand,
+        openSQLiteDatabaseCommand,
+        createSQLiteDatabaseCommand,
         showPanelCommand,
         outputChannel,
         { dispose: () => fileTransferMonitor.dispose() },
-        { dispose: () => clipboardManager.dispose() }
+        { dispose: () => clipboardManager.dispose() },
+        { dispose: () => sqliteManager.dispose() }
     );
 
     // Auto-open API Tester panel when extension activates
