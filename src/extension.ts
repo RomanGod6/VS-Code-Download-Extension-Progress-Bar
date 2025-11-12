@@ -12,8 +12,7 @@ import { APITester } from './apiTester';
 import { APITestPanel } from './apiTestPanel';
 import { EnvironmentManager } from './environmentManager';
 import { CollectionsManager } from './collectionsManager';
-import { SQLiteManager } from './sqliteManager';
-import { SQLitePanel } from './sqlitePanel';
+import { DatabaseManager } from './databaseManager';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Developer Toolbox extension is now active!');
@@ -30,7 +29,12 @@ export function activate(context: vscode.ExtensionContext) {
     const environmentManager = new EnvironmentManager(context, context.secrets);
     const collectionsManager = new CollectionsManager(context);
     const apiTester = new APITester(outputChannel, context, environmentManager);
-    const sqliteManager = new SQLiteManager(context);
+    const databaseManager = new DatabaseManager(context);
+
+    // Initialize database manager
+    databaseManager.initialize().catch(err => {
+        console.error('Failed to initialize database manager:', err);
+    });
 
     // Initialize tree providers
     const downloadTreeProvider = new DownloadTreeProvider(downloadManager);
@@ -499,32 +503,26 @@ export function activate(context: vscode.ExtensionContext) {
         }
     );
 
-    // ===== SQLITE COMMANDS =====
+    // ===== DATABASE COMMANDS =====
 
-    const openSQLiteCommand = vscode.commands.registerCommand(
+    const openDatabaseCommand = vscode.commands.registerCommand(
         'toolbox.openSQLite',
         () => {
-            SQLitePanel.createOrShow(sqliteManager, outputChannel);
+            vscode.window.showInformationMessage('Database Manager coming soon! Working on multi-database support.');
         }
     );
 
     const openSQLiteDatabaseCommand = vscode.commands.registerCommand(
         'toolbox.openSQLiteDatabase',
-        async () => {
-            const success = await sqliteManager.openDatabase();
-            if (success) {
-                SQLitePanel.createOrShow(sqliteManager, outputChannel);
-            }
+        () => {
+            vscode.window.showInformationMessage('Database Manager coming soon!');
         }
     );
 
     const createSQLiteDatabaseCommand = vscode.commands.registerCommand(
         'toolbox.createSQLiteDatabase',
-        async () => {
-            const success = await sqliteManager.createDatabase();
-            if (success) {
-                SQLitePanel.createOrShow(sqliteManager, outputChannel);
-            }
+        () => {
+            vscode.window.showInformationMessage('Database Manager coming soon!');
         }
     );
 
@@ -590,14 +588,14 @@ export function activate(context: vscode.ExtensionContext) {
         createCollectionCommand,
         importCollectionCommand,
         exportCollectionCommand,
-        openSQLiteCommand,
+        openDatabaseCommand,
         openSQLiteDatabaseCommand,
         createSQLiteDatabaseCommand,
         showPanelCommand,
         outputChannel,
         { dispose: () => fileTransferMonitor.dispose() },
         { dispose: () => clipboardManager.dispose() },
-        { dispose: () => sqliteManager.dispose() }
+        { dispose: () => databaseManager.dispose() }
     );
 
     // Auto-open API Tester panel when extension activates
