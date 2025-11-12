@@ -13,6 +13,7 @@ import { APITestPanel } from './apiTestPanel';
 import { EnvironmentManager } from './environmentManager';
 import { CollectionsManager } from './collectionsManager';
 import { DatabaseManager } from './databaseManager';
+import { DatabasePanel } from './databasePanel';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Developer Toolbox extension is now active!');
@@ -508,21 +509,21 @@ export function activate(context: vscode.ExtensionContext) {
     const openDatabaseCommand = vscode.commands.registerCommand(
         'toolbox.openSQLite',
         () => {
-            vscode.window.showInformationMessage('Database Manager coming soon! Working on multi-database support.');
+            DatabasePanel.createOrShow(context, databaseManager);
         }
     );
 
     const openSQLiteDatabaseCommand = vscode.commands.registerCommand(
         'toolbox.openSQLiteDatabase',
         () => {
-            vscode.window.showInformationMessage('Database Manager coming soon!');
+            DatabasePanel.createOrShow(context, databaseManager);
         }
     );
 
     const createSQLiteDatabaseCommand = vscode.commands.registerCommand(
         'toolbox.createSQLiteDatabase',
         () => {
-            vscode.window.showInformationMessage('Database Manager coming soon!');
+            DatabasePanel.createOrShow(context, databaseManager);
         }
     );
 
